@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Central Norte</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <link href="/static/css/accessibility.css" rel="stylesheet">
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                🏭 Central Norte <span class="badge bg-primary fw-normal small">Analytics v2</span>
+            </a>
+            <div class="d-flex text-secondary small fw-bold" id="last-update">--/--/---- --:--</div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 py-4">
+        
+        <div class="filter-container">
+            <h6 class="text-primary fw-bold mb-3 border-bottom pb-2">Configuración de Visualización</h6>
+            <div class="filter-grid">
+                <div class="filter-group">
+                    <label>Línea de Producción</label>
+                    <select id="line-select" class="form-select">
+                        <option value="ALL">Todas</option>
+                        <option value="linea_1">Línea 1</option>
+                        <option value="linea_2">Línea 2</option>
+                        <option value="linea_3">Línea 3 Semolín</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Mostrar Etiquetas</label>
+                    <select id="display-mode" class="form-select">
+                        <option value="name">Nombre del Producto</option>
+                        <option value="code">Código del Producto</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Fecha Inicio</label>
+                    <input type="date" id="date-start" class="form-control">
+                </div>
+                <div class="filter-group">
+                    <label>Hora Inicio</label>
+                    <input type="time" id="time-start" class="form-control" value="06:00">
+                </div>
+                <div class="filter-group">
+                    <label>Fecha Fin</label>
+                    <input type="date" id="date-end" class="form-control">
+                </div>
+                <div class="filter-group">
+                    <label>Hora Fin</label>
+                    <input type="time" id="time-end" class="form-control" value="06:00">
+                </div>
+
+                <div class="filter-group">
+                    <label>Turno</label>
+                    <select id="shift-select" class="form-select">
+                        <option value="custom" selected>Personalizado</option>
+                        <option value="all">Todos (24h)</option>
+                        <option value="morning">Mañana (05:00 - 13:00)</option>
+                        <option value="afternoon">Tarde (13:00 - 21:00)</option>
+                        <option value="night">Noche (21:00 - 05:00)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Intervalo</label>
+                    <select id="interval-select" class="form-select">
+                        <option value="1min">1 min</option>
+                        <option value="15min">15 min</option>
+                        <option value="1h" selected>1 hora</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Producto (Filtro)</label>
+                    <select id="product-select" class="form-select">
+                        <option value="ALL">Todos</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Umbral Parada (s)</label>
+                    <input type="number" id="downtime-threshold" class="form-control" value="300">
+                </div>
+                <div class="filter-group pt-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="show-stops-check">
+                        <label class="form-check-label" for="show-stops-check">Ver Paradas</label>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Tipo de Curva</label>
+                    <select id="curve-type" class="form-select">
+                        <option value="0.4">Suave</option>
+                        <option value="0">Recta</option>
+                        <option value="stepped">Escalonada</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12 text-center">
+                    <button id="btn-filter" class="btn btn-primary fw-bold px-5 shadow-sm">
+                        🔄 Actualizar Dashboard
+                    </button>
+                    <button id="btn-reset" class="btn btn-outline-secondary ms-2 px-4">
+                        Reset Hoy
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4 g-4 justify-content-center">
+            <div class="col-md-4">
+                <div class="card p-3 text-center h-100 border-0 border-bottom border-4 border-success shadow-sm">
+                    <div class="kpi-label mb-1">Producción Total (Salida)</div>
+                    <div class="kpi-value text-success" id="kpi-output">0</div>
+                    <small class="text-muted">Bolsas Paletizadas</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3 text-center h-100 border-0 border-bottom border-4 border-danger shadow-sm">
+                    <div class="kpi-label mb-1">Paradas Registradas</div>
+                    <div class="d-flex justify-content-center align-items-baseline gap-2">
+                        <div class="kpi-value text-danger" id="kpi-downtime-count">0</div>
+                        <span class="text-muted">eventos</span>
+                    </div>
+                    <div class="fw-bold text-danger mt-1" id="kpi-downtime-time">00:00:00</div>
+                    <small class="text-muted">Tiempo Total Acumulado</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <span class="fw-bold text-primary">📈 Evolución de Producción por Producto</span>
+                <small class="text-muted">Tip: Usa la rueda del mouse para hacer Zoom</small>
+            </div>
+            <div class="card-body">
+                <div style="height: 400px;">
+                    <canvas id="productionChart"></canvas>
+                </div>
+                <div class="text-center mt-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="resetZoomChart()">Restablecer Zoom</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header fw-bold text-primary">📊 Balance de Línea: Entrada vs Salida vs Descarte</div>
+            <div class="card-body">
+                <div style="height: 300px;">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row g-4 mb-4">
+            <div class="col-lg-5">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header fw-bold text-primary">Distribución</div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-center mb-3" style="height: 250px;">
+                            <canvas id="productPieChart"></canvas>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle small">
+                                <thead class="table-light"><tr><th>Producto</th><th>Bolsas</th><th>%</th></tr></thead>
+                                <tbody id="summary-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-7">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header d-flex justify-content-between bg-danger text-white">
+                        <span class="fw-bold">⚠️ Registro Detallado de Paradas</span>
+                    </div>
+                    <div class="card-body p-0 table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-striped table-hover mb-0 align-middle">
+                            <thead class="table-light sticky-top">
+                                <tr><th>Línea</th><th>Inicio</th><th>Fin</th><th>Duración</th></tr>
+                            </thead>
+                            <tbody id="downtime-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+    
+    <script type="module" src="/static/js/main.js"></script>
+    
+    <script>
+        function resetZoomChart() {
+            // Se dispara evento custom o se accede a la instancia global si se expone
+            document.dispatchEvent(new Event('reset-chart-zoom'));
+        }
+    </script>
+</body>
+</html>

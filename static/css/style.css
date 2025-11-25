@@ -1,0 +1,121 @@
+/* static/css/style.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Tus Variables */
+  --primary-color: #2c5282;
+  --primary-dark: #1a365d;
+  --primary-light: #4a90b8;
+  --secondary-color: #48bb78;
+  --secondary-dark: #2f855a;
+  
+  /* Colores neutrales */
+  --bg-color: #f7fafc;
+  --surface-color: #ffffff;
+  --border-color: #e2e8f0;
+  --text-primary: #2d3748;
+  --text-secondary: #718096;
+  
+  /* Estados */
+  --success-color: #48bb78;
+  --warning-color: #ed8936;
+  --error-color: #f56565;
+  --info-color: #4299e1;
+
+  /* UI */
+  --border-radius: 8px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05);
+  --font-family: 'Maven Pro', sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+}
+
+/* Navbar */
+.navbar {
+    background-color: var(--surface-color);
+    box-shadow: var(--shadow-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+.navbar-brand {
+    color: var(--primary-dark) !important;
+    font-weight: 700;
+}
+
+/* Cards */
+.card {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+}
+.card-header {
+    background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    color: var(--primary-color);
+    padding: 1rem;
+}
+
+/* Filtros Grid (Estilo imagen referencia) */
+.filter-container {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-md);
+}
+
+.filter-grid {
+    display: grid;
+    /* Crea columnas automáticas de mínimo 200px */
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    row-gap: 1.5rem;
+}
+
+.filter-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.4rem;
+}
+
+.form-control, .form-select {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    padding: 0.5rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+}
+
+/* Botones */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+.btn-primary:hover {
+    background-color: var(--primary-dark);
+}
+
+/* KPIs */
+.kpi-value {
+    color: var(--primary-dark);
+    font-weight: 800;
+}
+.kpi-label {
+    color: var(--text-secondary);
+}

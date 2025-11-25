@@ -1,0 +1,7 @@
+pandas
+pymysql
+datetime
+sqlalchemy
+flask
+flask-cors
+python-dotenv
