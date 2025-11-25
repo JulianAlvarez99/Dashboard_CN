@@ -2,10 +2,22 @@ import pandas as pd
 import numpy as np
 
 class DataProcessor:
-
+    """
+    Clase encargada de la lógica de negocio: transformación de datos, 
+    cálculo de KPIs y preparación de estructuras para gráficos.
+    """
     @staticmethod
     def filter_by_shift(df, shift):
-        """Filtra el DataFrame según el horario del turno."""
+        """
+        Filtra el DataFrame basándose en la hora del día según el turno.
+        
+        Args:
+            df (pd.DataFrame): DataFrame con columna 'timestamp'.
+            shift (str): Identificador del turno ('morning', 'afternoon', 'night').
+            
+        Returns:
+            pd.DataFrame: DataFrame filtrado por las horas del turno.
+        """
         if df.empty: return df
         
         # Extraemos la hora
@@ -21,6 +33,16 @@ class DataProcessor:
     
     @staticmethod
     def calculate_global_kpis(df, downtime_events):
+        """
+        Calcula los indicadores clave de rendimiento (KPIs) globales.
+        
+        Args:
+            df (pd.DataFrame): DataFrame de producción.
+            downtime_events (list): Lista de diccionarios con eventos de parada.
+            
+        Returns:
+            dict: Diccionario con totales, contadores y strings formateados.
+        """
         if df.empty:
             return {
                 'total_output': 0,
@@ -61,6 +83,18 @@ class DataProcessor:
     
     @staticmethod
     def get_product_chart_data(df, interval='1h', query_start=None, query_end=None):
+        """
+        Genera la estructura de datos para el gráfico de líneas por producto.
+        
+        Args:
+            df (pd.DataFrame): Datos crudos.
+            interval (str): Frecuencia de agrupación (ej: '1h', '15min').
+            query_start (datetime): Inicio del rango de visualización.
+            query_end (datetime): Fin del rango de visualización.
+            
+        Returns:
+            dict: Objeto con 'labels' (eje X) y 'datasets' (series por producto).
+        """
         empty_response = {'labels': [], 'datasets': []}
         if df.empty and not query_start: return empty_response
 
@@ -126,6 +160,9 @@ class DataProcessor:
 
     @staticmethod
     def get_entry_exit_comparison(df, interval='1h', query_start=None, query_end=None):
+        """
+        Genera datos para el gráfico de barras comparativo (Entrada vs Salida).
+        """
         if df.empty: return {'labels':[], 'entry':[], 'exit':[], 'diff':[]}
         
         # Verificación de seguridad
@@ -170,7 +207,16 @@ class DataProcessor:
     @staticmethod
     def calculate_downtime(df, threshold_seconds=60, query_start=None, query_end=None):
         """
-        Detecta paradas incluyendo huecos al inicio y final del intervalo consultado.
+        Detecta paradas (huecos de producción) incluyendo los extremos del intervalo.
+        
+        Args:
+            df (pd.DataFrame): Datos crudos.
+            threshold_seconds (int): Tiempo mínimo en segundos para considerar parada.
+            query_start (datetime): Inicio del filtro (para calcular hueco inicial).
+            query_end (datetime): Fin del filtro (para calcular hueco final).
+            
+        Returns:
+            list: Lista de objetos parada ordenados cronológicamente inverso.
         """
         if df.empty: return []
         if 'line_key' not in df.columns or 'is_entry' not in df.columns: return []
@@ -232,6 +278,9 @@ class DataProcessor:
 
     @staticmethod
     def get_product_distribution(df):
+        """
+        Calcula la distribución porcentual de productos (Torta).
+        """
         if df.empty: return []
         # Usamos is_exit para contar producto terminado real
         if 'is_exit' not in df.columns: return []
@@ -243,3 +292,5 @@ class DataProcessor:
         stats.rename(columns={'id': 'cantidad'}, inplace=True)
         stats['percent'] = (stats['cantidad'] / total * 100).round(2) if total > 0 else 0
         return stats.to_dict(orient='records')
+    
+# Fin de data_processor.py

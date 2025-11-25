@@ -1,15 +1,32 @@
 /* static/js/modules/charts.js */
 
+/**
+ * Módulo de Gráficos (Chart.js).
+ * Encargado de inicializar, configurar y renderizar los gráficos.
+ */
+
+// Instancias globales para poder destruirlas antes de redibujar
 let productionChartInstance = null;
 let comparisonChartInstance = null;
 let productPieChartInstance = null;
 
-const ZOOM_OPTIONS = {
-    pan: { enabled: true, mode: 'x' },
-    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+// Configuración unificada de Zoom y Pan (DRY)
+const COMMON_ZOOM_OPTIONS = {
+    pan: {
+        enabled: true,
+        mode: 'x'
+    },
+    zoom: {
+        wheel: { enabled: true },
+        pinch: { enabled: true },
+        mode: 'x',
+    }
 };
 
-// Función auxiliar para crear colores transparentes
+/**
+ * Convierte un color HEX a RGBA con transparencia.
+ * Útil para rellenar áreas bajo la curva sin ocultar la grilla.
+ */
 function hexToRgba(hex, alpha) {
     if (!hex || !hex.startsWith('#')) return hex;
     const r = parseInt(hex.slice(1, 3), 16);
@@ -18,80 +35,84 @@ function hexToRgba(hex, alpha) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/**
+ * Renderiza el gráfico principal de Evolución de Producción.
+ * Incluye lógica para mostrar áreas transparentes y marcas de parada.
+ */
 export function renderProductionChart(ctx, chartData, options = {}, downtimeEvents = []) {
     if (productionChartInstance) productionChartInstance.destroy();
 
-    // 1. Configurar Datasets (Estilo Área Transparente)
+    // 1. Pre-procesamiento de Datasets
     chartData.datasets.forEach(ds => {
         ds.borderWidth = 2;
         
-        // Convertir color de borde a relleno transparente (20%)
+        // Aplicar transparencia al fondo basada en el color del borde
         if (ds.borderColor && ds.borderColor.startsWith('#')) {
             ds.backgroundColor = hexToRgba(ds.borderColor, 0.2);
             ds.fill = true; 
         }
 
-        // Configuración de Curva
+        // Configurar estilo de línea según opción (Curva vs Escalonada)
         if (options.curveType === 'stepped') {
-            ds.stepped = true; ds.tension = 0;
+            ds.stepped = true; 
+            ds.tension = 0;
         } else {
-            ds.stepped = false; ds.tension = parseFloat(options.curveType || 0.4);
+            ds.stepped = false; 
+            ds.tension = parseFloat(options.curveType || 0.4);
         }
         
-        ds.pointRadius = 0;
-        ds.hitRadius = 10;
+        ds.pointRadius = 0; // Sin puntos para limpiar visualmente
+        ds.hitRadius = 10;  // Área de hover más grande
     });
 
-    // 2. Lógica de Anotaciones (Marcas de Parada con Etiquetas)
+    // 2. Generar Anotaciones para Paradas (Líneas Verticales)
     const annotations = {};
+    // Solo mostramos paradas si el checkbox está activo y no estamos viendo "Todas las líneas" juntas
     if (options.showStops && downtimeEvents.length > 0 && !options.isAllLines) {
         downtimeEvents.forEach((evt, index) => {
             
-            // Strings de fecha para buscar coincidencia en el eje X
-            const stopTimeStr = new Date(evt.start_time).toLocaleString('es-AR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false}).replace(',', '');
-            const restartTimeStr = new Date(evt.end_time).toLocaleString('es-AR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false}).replace(',', '');
+            // Formateamos fechas para buscar coincidencia aproximada en las etiquetas del eje X
+            const stopTimeStr = new Date(evt.start_time).toLocaleString('es-AR', {
+                day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false
+            }).replace(',', '');
             
-            // Buscar índices aproximados
+            const restartTimeStr = new Date(evt.end_time).toLocaleString('es-AR', {
+                day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false
+            }).replace(',', '');
+            
+            // Buscar índices en el array de labels
             const startIndex = chartData.labels.findIndex(l => l >= stopTimeStr);
             const endIndex = chartData.labels.findIndex(l => l >= restartTimeStr);
 
-            // --- MARCA DE INICIO (ROJA) ---
+            // Configurar línea de Inicio (Roja)
             if (startIndex !== -1) {
                 annotations[`stop_start_${index}`] = {
                     type: 'line',
                     scaleID: 'x',
                     value: chartData.labels[startIndex],
-                    borderColor: '#e53e3e', // Rojo
+                    borderColor: '#e53e3e',
                     borderWidth: 2,
                     label: {
-                        display: true,
-                        content: 'Inicio',
-                        position: 'start', // Arriba
-                        backgroundColor: 'rgba(229, 62, 62, 0.8)',
-                        color: 'white',
-                        font: { size: 10 },
-                        yAdjust: 0 // Posición vertical
+                        display: true, content: 'Inicio', position: 'start',
+                        backgroundColor: 'rgba(229, 62, 62, 0.8)', color: 'white', font: { size: 10 },
+                        yAdjust: 0
                     }
                 };
             }
 
-            // --- MARCA DE FIN (VERDE) ---
+            // Configurar línea de Fin (Verde)
             if (endIndex !== -1) {
                 annotations[`stop_end_${index}`] = {
                     type: 'line',
                     scaleID: 'x',
                     value: chartData.labels[endIndex],
-                    borderColor: '#38a169', // Verde
+                    borderColor: '#38a169',
                     borderWidth: 2,
                     borderDash: [5, 5],
                     label: {
-                        display: true,
-                        content: 'Fin',
-                        position: 'start', // Arriba
-                        backgroundColor: 'rgba(56, 161, 105, 0.8)',
-                        color: 'white',
-                        font: { size: 10 },
-                        yAdjust: 20 // Un poco más abajo para no solaparse con "Inicio" si es corto
+                        display: true, content: 'Fin', position: 'start',
+                        backgroundColor: 'rgba(56, 161, 105, 0.8)', color: 'white', font: { size: 10 },
+                        yAdjust: 20 // Desplazar para evitar solapamiento
                     }
                 };
             }
@@ -102,26 +123,19 @@ export function renderProductionChart(ctx, chartData, options = {}, downtimeEven
         type: 'line',
         data: { labels: chartData.labels, datasets: chartData.datasets },
         options: {
-            responsive: true, maintainAspectRatio: false,
+            responsive: true, 
+            maintainAspectRatio: false,
             interaction: { mode: 'nearest', axis: 'x', intersect: false },
             plugins: {
-                zoom: ZOOM_OPTIONS,
+                zoom: COMMON_ZOOM_OPTIONS,
                 annotation: { annotations: annotations },
                 legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
-                tooltip: { 
-                    callbacks: {
-                        title: (items) => items[0].label
-                    }
-                }
+                tooltip: { callbacks: { title: (items) => items[0].label } }
             },
             scales: {
                 x: { 
                     grid: { display: false },
-                    ticks: { 
-                        maxRotation: 60,
-                        minRotation: 60,
-                        autoSkip: true 
-                    } 
+                    ticks: { maxRotation: 60, minRotation: 60, autoSkip: true } 
                 },
                 y: { beginAtZero: true }
             }
@@ -129,6 +143,9 @@ export function renderProductionChart(ctx, chartData, options = {}, downtimeEven
     });
 }
 
+/**
+ * Renderiza el gráfico de Balance (Barras Apiladas).
+ */
 export function renderComparisonChart(ctx, data) {
     if (comparisonChartInstance) comparisonChartInstance.destroy();
 
@@ -185,6 +202,9 @@ export function renderComparisonChart(ctx, data) {
     });
 }
 
+/**
+ * Renderiza el gráfico de distribución (Dona).
+ */
 export function renderProductPieChart(ctx, productsData) {
     if (productPieChartInstance) productPieChartInstance.destroy();
 
@@ -196,13 +216,15 @@ export function renderProductPieChart(ctx, productsData) {
         type: 'doughnut',
         data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } }, 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }, // Leyenda oculta (se usa tabla)
             cutout: '60%'
         }
     });
 }
 
+// Listener global para resetear zoom desde botón externo
 document.addEventListener('reset-chart-zoom', () => {
     if (productionChartInstance) productionChartInstance.resetZoom();
     if (comparisonChartInstance) comparisonChartInstance.resetZoom();
