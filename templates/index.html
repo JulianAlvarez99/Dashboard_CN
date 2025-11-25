@@ -13,7 +13,7 @@
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container-fluid px-4">
             <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                🏭 Central Norte <span class="badge bg-primary fw-normal small">Analytics v2.1</span>
+                🏭 Central Norte <span class="badge bg-primary fw-normal small">Analytics v2.2</span>
             </a>
             <div class="d-flex text-secondary small fw-bold" id="last-update">Esperando actualización...</div>
         </div>
@@ -58,13 +58,12 @@
                 </div>
 
                 <div class="filter-group">
-                    <label>Turno</label>
+                    <label>Turno (Filtro Horario)</label>
                     <select id="shift-select" class="form-select">
-                        <option value="custom">Personalizado</option>
-                        <option value="all">Todos</option>
-                        <option value="morning">Mañana (06:00 - 14:00)</option>
-                        <option value="afternoon">Tarde (14:00 - 22:00)</option>
-                        <option value="night">Noche (22:00 - 06:00)</option>
+                        <option value="all">Todos (24hs)</option>
+                        <option value="morning">Turno Mañana (06:00 - 14:00)</option>
+                        <option value="afternoon">Turno Tarde (14:00 - 22:00)</option>
+                        <option value="night">Turno Noche (22:00 - 06:00)</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -73,6 +72,8 @@
                         <option value="1min">1 min</option>
                         <option value="15min">15 min</option>
                         <option value="1h" selected>1 hora</option>
+                        <option value="1W">1 Semana</option>
+                        <option value="1ME">1 Mes</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -158,7 +159,7 @@
             <div class="card mb-4 shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center bg-light">
                     <span class="fw-bold text-primary">📈 Evolución de Producción</span>
-                    <small class="text-muted">Rueda del mouse: Zoom | Click + Arrastre: Pan</small>
+                    <small class="text-muted">Zoom: Rueda del mouse | Pan: Click + Arrastre</small>
                 </div>
                 <div class="card-body">
                     <div style="height: 450px;">
@@ -191,7 +192,7 @@
                         <div class="col-md-8">
                             <div class="table-responsive">
                                 <table class="table table-bordered align-middle small table-striped">
-                                    <thead class="table-light"><tr><th>Producto</th><th>Color</th><th>Bolsas</th><th>% Total</th></tr></thead>
+                                    <thead class="table-light"><tr><th>Producto</th><th>Bolsas</th><th>% Total</th></tr></thead>
                                     <tbody id="summary-table-body"></tbody>
                                 </table>
                             </div>
@@ -214,15 +215,14 @@
                 </div>
             </div>
 
-        </div> </div>
+        </div> 
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
-    
     <script type="module" src="/static/js/main.js"></script>
-    
     <script>
         function resetZoomChart() {
             document.dispatchEvent(new Event('reset-chart-zoom'));

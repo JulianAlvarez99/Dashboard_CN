@@ -18,6 +18,7 @@ def get_dashboard_data():
         interval = request.args.get('interval', '1h')
         lines_param = request.args.get('lines')
         product_id_param = request.args.get('product_id') # NUEVO FILTRO
+        shift_param = request.args.get('shift') # NUEVO FILTRO
         
         # Fechas
         if end_str: end_date = datetime.fromisoformat(end_str)
@@ -31,12 +32,23 @@ def get_dashboard_data():
         # 1. Obtener Raw Data
         df = db_manager.get_raw_production_data(start_date, end_date, selected_lines)
         
-        # 2. Filtrado por Producto (NUEVO: Se hace en memoria/pandas)
-        if product_id_param and product_id_param != 'ALL' and not df.empty:
-            df = df[df['class_id'] == int(product_id_param)]
+        # 2. Filtrado por Producto y Turno (NUEVO: Se hace en memoria/pandas)
+        if not df.empty:
+            # Filtro Producto
+            if product_id_param and product_id_param != 'ALL':
+                df = df[df['class_id'] == int(product_id_param)]
+            
+            # Filtro Turno (Nuevo)
+            if shift_param and shift_param != 'all':
+                df = DataProcessor.filter_by_shift(df, shift_param)
 
         # 3. Procesar
-        downtime = DataProcessor.calculate_downtime(df, threshold_seconds=300)
+        downtime = DataProcessor.calculate_downtime(
+            df, 
+            threshold_seconds=300, 
+            query_start=start_date, 
+            query_end=end_date
+        )
         # Pasamos 'downtime' a kpis para calcular totales
         kpis = DataProcessor.calculate_global_kpis(df, downtime)
         

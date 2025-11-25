@@ -9,45 +9,92 @@ const ZOOM_OPTIONS = {
     zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
 };
 
+// Función auxiliar para crear colores transparentes
+function hexToRgba(hex, alpha) {
+    if (!hex || !hex.startsWith('#')) return hex;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export function renderProductionChart(ctx, chartData, options = {}, downtimeEvents = []) {
     if (productionChartInstance) productionChartInstance.destroy();
 
-    // 1. Configuraciones de Dataset
+    // 1. Configurar Datasets (Estilo Área Transparente)
     chartData.datasets.forEach(ds => {
         ds.borderWidth = 2;
+        
+        // Convertir color de borde a relleno transparente (20%)
+        if (ds.borderColor && ds.borderColor.startsWith('#')) {
+            ds.backgroundColor = hexToRgba(ds.borderColor, 0.2);
+            ds.fill = true; 
+        }
+
+        // Configuración de Curva
         if (options.curveType === 'stepped') {
             ds.stepped = true; ds.tension = 0;
         } else {
             ds.stepped = false; ds.tension = parseFloat(options.curveType || 0.4);
         }
+        
         ds.pointRadius = 0;
         ds.hitRadius = 10;
     });
 
-    // 2. Anotaciones de Parada (Líneas Verticales)
-    // Usamos el plugin 'annotation' si está disponible
+    // 2. Lógica de Anotaciones (Marcas de Parada con Etiquetas)
     const annotations = {};
     if (options.showStops && downtimeEvents.length > 0 && !options.isAllLines) {
         downtimeEvents.forEach((evt, index) => {
-            // Línea de Inicio (Roja)
-            annotations[`stop_start_${index}`] = {
-                type: 'line',
-                xMin: evt.start_time,
-                xMax: evt.start_time,
-                borderColor: 'red',
-                borderWidth: 2,
-                label: { display: false }
-            };
-            // Línea de Fin (Verde)
-            annotations[`stop_end_${index}`] = {
-                type: 'line',
-                xMin: evt.end_time,
-                xMax: evt.end_time,
-                borderColor: 'green',
-                borderWidth: 2,
-                borderDash: [5, 5], // Punteada para el fin
-                label: { display: false }
-            };
+            
+            // Strings de fecha para buscar coincidencia en el eje X
+            const stopTimeStr = new Date(evt.start_time).toLocaleString('es-AR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false}).replace(',', '');
+            const restartTimeStr = new Date(evt.end_time).toLocaleString('es-AR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false}).replace(',', '');
+            
+            // Buscar índices aproximados
+            const startIndex = chartData.labels.findIndex(l => l >= stopTimeStr);
+            const endIndex = chartData.labels.findIndex(l => l >= restartTimeStr);
+
+            // --- MARCA DE INICIO (ROJA) ---
+            if (startIndex !== -1) {
+                annotations[`stop_start_${index}`] = {
+                    type: 'line',
+                    scaleID: 'x',
+                    value: chartData.labels[startIndex],
+                    borderColor: '#e53e3e', // Rojo
+                    borderWidth: 2,
+                    label: {
+                        display: true,
+                        content: 'Inicio',
+                        position: 'start', // Arriba
+                        backgroundColor: 'rgba(229, 62, 62, 0.8)',
+                        color: 'white',
+                        font: { size: 10 },
+                        yAdjust: 0 // Posición vertical
+                    }
+                };
+            }
+
+            // --- MARCA DE FIN (VERDE) ---
+            if (endIndex !== -1) {
+                annotations[`stop_end_${index}`] = {
+                    type: 'line',
+                    scaleID: 'x',
+                    value: chartData.labels[endIndex],
+                    borderColor: '#38a169', // Verde
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    label: {
+                        display: true,
+                        content: 'Fin',
+                        position: 'start', // Arriba
+                        backgroundColor: 'rgba(56, 161, 105, 0.8)',
+                        color: 'white',
+                        font: { size: 10 },
+                        yAdjust: 20 // Un poco más abajo para no solaparse con "Inicio" si es corto
+                    }
+                };
+            }
         });
     }
 
@@ -59,13 +106,11 @@ export function renderProductionChart(ctx, chartData, options = {}, downtimeEven
             interaction: { mode: 'nearest', axis: 'x', intersect: false },
             plugins: {
                 zoom: ZOOM_OPTIONS,
-                annotation: { annotations: annotations }, // Inyectar anotaciones
+                annotation: { annotations: annotations },
                 legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
                 tooltip: { 
                     callbacks: {
-                        title: (items) => {
-                            return items[0].label; // Mostrar fecha completa
-                        }
+                        title: (items) => items[0].label
                     }
                 }
             },
@@ -73,7 +118,7 @@ export function renderProductionChart(ctx, chartData, options = {}, downtimeEven
                 x: { 
                     grid: { display: false },
                     ticks: { 
-                        maxRotation: 60, // Rotación solicitada
+                        maxRotation: 60,
                         minRotation: 60,
                         autoSkip: true 
                     } 
@@ -100,32 +145,41 @@ export function renderComparisonChart(ctx, data) {
                 { 
                     label: 'Entrada', 
                     data: data.entry, 
-                    backgroundColor: '#3182ce', // Azul
-                    order: 2
+                    backgroundColor: '#3182ce', 
+                    stack: 'Stack 0', 
+                    order: 1
                 },
                 { 
                     label: 'Salida', 
                     data: data.exit, 
-                    backgroundColor: '#38a169', // Verde
-                    order: 2
+                    backgroundColor: '#38a169', 
+                    stack: 'Stack 1', 
+                    order: 1
                 },
                 { 
                     label: 'Descarte', 
                     data: data.diff, 
-                    backgroundColor: '#e53e3e', // Rojo
-                    borderColor: '#9b2c2c',
-                    borderWidth: 1,
-                    // Mostramos descarte como una barra separada pero clara
-                    order: 1 
+                    backgroundColor: '#e53e3e', 
+                    stack: 'Stack 1', 
+                    order: 1
                 }
             ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { zoom: ZOOM_OPTIONS_LOCAL },
+            plugins: { 
+                zoom: ZOOM_OPTIONS_LOCAL,
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
             scales: { 
-                y: { beginAtZero: true },
-                x: { stacked: false } // Barras lado a lado para comparar mejor
+                y: { beginAtZero: true, title: { display: true, text: 'Bolsas' } },
+                x: { 
+                    stacked: true, 
+                    ticks: { maxRotation: 60, minRotation: 60, autoSkip: true }
+                } 
             }
         }
     });

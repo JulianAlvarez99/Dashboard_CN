@@ -29,9 +29,6 @@ async function loadProducts() {
 function setupEventListeners() {
     document.getElementById('btn-filter').addEventListener('click', applyFilters);
     document.getElementById('btn-pdf').addEventListener('click', () => alert("Funcionalidad de PDF pendiente de implementación."));
-    document.getElementById('shift-select').addEventListener('change', (e) => {
-        handleShiftChange(e.target.value);
-    });
 }
 
 function setInitialDefaults() {
@@ -99,6 +96,7 @@ async function applyFilters() {
         const interval = document.getElementById('interval-select').value;
         const line = document.getElementById('line-select').value;
         const prodId = document.getElementById('product-select').value;
+        const shift = document.getElementById('shift-select').value;
 
         // Opciones visuales
         const vizOptions = {
@@ -112,6 +110,7 @@ async function applyFilters() {
         let apiUrl = `/api/dashboard?interval=${interval}&start=${startIso}&end=${endIso}`;
         if (line !== 'ALL') apiUrl += `&lines=${line}`;
         if (prodId !== 'ALL') apiUrl += `&product_id=${prodId}`;
+        if (shift !== 'all') apiUrl += `&shift=${shift}`;
 
         const response = await fetch(apiUrl);
         if (!response.ok) {
@@ -144,6 +143,7 @@ async function applyFilters() {
 
         // Renderizar Gráficos
         const mainCtx = document.getElementById('productionChart').getContext('2d');
+        // Pasamos las labels del gráfico para que el renderer pueda alinear las paradas
         renderProductionChart(mainCtx, data.charts.main, vizOptions, data.downtime.events);
         
         const compCtx = document.getElementById('comparisonChart').getContext('2d');
