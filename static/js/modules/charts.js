@@ -4,50 +4,50 @@ let productionChartInstance = null;
 let comparisonChartInstance = null;
 let productPieChartInstance = null;
 
-// Configuración común de Zoom
 const ZOOM_OPTIONS = {
     pan: { enabled: true, mode: 'x' },
-    zoom: {
-        wheel: { enabled: true },
-        pinch: { enabled: true },
-        mode: 'x',
-    }
-};
-
-// Colores (Light Theme compatible)
-const LINE_COLORS = {
-    'linea_1': '#3182ce', // Azul fuerte
-    'linea_2': '#38a169', // Verde
-    'linea_3': '#d53f8c', // Rosa
-    'TOTAL PLANTA': '#e53e3e' // Rojo
+    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
 };
 
 export function renderProductionChart(ctx, chartData, options = {}, downtimeEvents = []) {
     if (productionChartInstance) productionChartInstance.destroy();
 
-    // Configurar datasets (Productos)
+    // 1. Configuraciones de Dataset
     chartData.datasets.forEach(ds => {
-        // El color ya viene del backend (ds.borderColor)
         ds.borderWidth = 2;
-        
-        // Tipo de Curva
         if (options.curveType === 'stepped') {
             ds.stepped = true; ds.tension = 0;
         } else {
             ds.stepped = false; ds.tension = parseFloat(options.curveType || 0.4);
         }
         ds.pointRadius = 0;
-        ds.hitRadius = 10; // Facilita el hover
+        ds.hitRadius = 10;
     });
 
-    // Marcadores de Parada (Scatter)
-    if (options.showStops && downtimeEvents.length > 0) {
-        const stopPoints = downtimeEvents.map(evt => ({
-            x: evt.start_time, y: 0, line: evt.line, duration: evt.duration_formatted
-        }));
-        chartData.datasets.push({
-            label: 'Paradas', data: stopPoints, type: 'scatter',
-            backgroundColor: '#e53e3e', pointStyle: 'triangle', pointRadius: 8, order: 0
+    // 2. Anotaciones de Parada (Líneas Verticales)
+    // Usamos el plugin 'annotation' si está disponible
+    const annotations = {};
+    if (options.showStops && downtimeEvents.length > 0 && !options.isAllLines) {
+        downtimeEvents.forEach((evt, index) => {
+            // Línea de Inicio (Roja)
+            annotations[`stop_start_${index}`] = {
+                type: 'line',
+                xMin: evt.start_time,
+                xMax: evt.start_time,
+                borderColor: 'red',
+                borderWidth: 2,
+                label: { display: false }
+            };
+            // Línea de Fin (Verde)
+            annotations[`stop_end_${index}`] = {
+                type: 'line',
+                xMin: evt.end_time,
+                xMax: evt.end_time,
+                borderColor: 'green',
+                borderWidth: 2,
+                borderDash: [5, 5], // Punteada para el fin
+                label: { display: false }
+            };
         });
     }
 
@@ -58,16 +58,26 @@ export function renderProductionChart(ctx, chartData, options = {}, downtimeEven
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'nearest', axis: 'x', intersect: false },
             plugins: {
-                zoom: ZOOM_OPTIONS, // Activar Zoom
+                zoom: ZOOM_OPTIONS,
+                annotation: { annotations: annotations }, // Inyectar anotaciones
                 legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
-                tooltip: {
+                tooltip: { 
                     callbacks: {
-                        label: (ctx) => ctx.dataset.label === 'Paradas' ? `${ctx.raw.line}: ${ctx.raw.duration}` : `${ctx.dataset.label}: ${ctx.parsed.y}`
+                        title: (items) => {
+                            return items[0].label; // Mostrar fecha completa
+                        }
                     }
                 }
             },
             scales: {
-                x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true } },
+                x: { 
+                    grid: { display: false },
+                    ticks: { 
+                        maxRotation: 60, // Rotación solicitada
+                        minRotation: 60,
+                        autoSkip: true 
+                    } 
+                },
                 y: { beginAtZero: true }
             }
         }
@@ -77,8 +87,7 @@ export function renderProductionChart(ctx, chartData, options = {}, downtimeEven
 export function renderComparisonChart(ctx, data) {
     if (comparisonChartInstance) comparisonChartInstance.destroy();
 
-    // Definir opciones de zoom localmente si no están globales
-    const ZOOM_OPTIONS = {
+    const ZOOM_OPTIONS_LOCAL = {
         pan: { enabled: true, mode: 'x' },
         zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
     };
@@ -88,33 +97,43 @@ export function renderComparisonChart(ctx, data) {
         data: {
             labels: data.labels,
             datasets: [
-                { label: 'Entrada', data: data.entry, backgroundColor: '#3182ce' },
-                { label: 'Salida', data: data.exit, backgroundColor: '#38a169' },
                 { 
-                    label: 'Descarte (Calc)', 
+                    label: 'Entrada', 
+                    data: data.entry, 
+                    backgroundColor: '#3182ce', // Azul
+                    order: 2
+                },
+                { 
+                    label: 'Salida', 
+                    data: data.exit, 
+                    backgroundColor: '#38a169', // Verde
+                    order: 2
+                },
+                { 
+                    label: 'Descarte', 
                     data: data.diff, 
-                    backgroundColor: '#e53e3e', 
-                    type: 'line', 
-                    borderColor: '#e53e3e', 
-                    borderDash: [5,5], 
-                    fill: false,
-                    pointRadius: 0
+                    backgroundColor: '#e53e3e', // Rojo
+                    borderColor: '#9b2c2c',
+                    borderWidth: 1,
+                    // Mostramos descarte como una barra separada pero clara
+                    order: 1 
                 }
             ]
         },
         options: {
-            responsive: true, 
-            maintainAspectRatio: false,
-            plugins: { zoom: ZOOM_OPTIONS },
-            scales: { y: { beginAtZero: true } }
+            responsive: true, maintainAspectRatio: false,
+            plugins: { zoom: ZOOM_OPTIONS_LOCAL },
+            scales: { 
+                y: { beginAtZero: true },
+                x: { stacked: false } // Barras lado a lado para comparar mejor
+            }
         }
     });
 }
 
 export function renderProductPieChart(ctx, productsData) {
     if (productPieChartInstance) productPieChartInstance.destroy();
-    // ... (Tu lógica de torta existente) ...
-    // Asegúrate de usar productsData que ya trae nombres y colores
+
     const labels = productsData.map(p => p.product_name.replace(/_/g, ' '));
     const values = productsData.map(p => p.cantidad);
     const colors = productsData.map(p => p.color);
@@ -124,13 +143,12 @@ export function renderProductPieChart(ctx, productsData) {
         data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } }, // Ocultamos leyenda porque hay tabla al lado
-            cutout: '70%'
+            plugins: { legend: { display: false } }, 
+            cutout: '60%'
         }
     });
 }
 
-// Escuchar evento global para resetear zoom
 document.addEventListener('reset-chart-zoom', () => {
     if (productionChartInstance) productionChartInstance.resetZoom();
     if (comparisonChartInstance) comparisonChartInstance.resetZoom();

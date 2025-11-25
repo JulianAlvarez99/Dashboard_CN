@@ -103,9 +103,11 @@ class DataManager:
             class_dict = self.metadata_cache.get('classes', {})
             id_to_name = {k: v['class_name'] for k, v in class_dict.items()}
             id_to_color = {k: v['color'] for k, v in class_dict.items()}
+            id_to_weight = {k: v['class_weight'] for k, v in class_dict.items()}
             
             final_df['product_name'] = final_df['class_id'].map(id_to_name).fillna("Desconocido")
             final_df['color'] = final_df['class_id'].map(id_to_color).fillna("#000000")
+            final_df['class_weight'] = final_df['class_id'].map(id_to_weight).fillna(0)
             
             # 2. Mapeo de Cámaras (NUEVO)
             # Usamos el area_id del registro para saber qué cámara lo vió

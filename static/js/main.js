@@ -1,18 +1,12 @@
 /* static/js/main.js */
 
-import { renderProductionChart, renderComparisonChart, renderProductPieChart } from './modules/charts.js'; // Importamos renderComparison
+import { renderProductionChart, renderComparisonChart, renderProductPieChart } from './modules/charts.js';
 import { updateKPIs, renderDowntimeTable, renderSummaryTable, updateLastUpdatedTime, showLoading } from './modules/ui.js';
 
-// --- CONFIGURACIÓN Y ESTADO ---
 document.addEventListener('DOMContentLoaded', () => {
-    loadProducts(); // Cargar combo productos
+    loadProducts(); 
     setupEventListeners();
-    
-    // Setear fechas por defecto (Hoy)
-    resetFilters();
-    
-    // Carga inicial
-    applyFilters();
+    setInitialDefaults(); // Setea fechas pero NO carga datos
 });
 
 async function loadProducts() {
@@ -20,7 +14,7 @@ async function loadProducts() {
         const response = await fetch('/api/products_list');
         const products = await response.json();
         const select = document.getElementById('product-select');
-        
+        select.innerHTML = '<option value="ALL">Todos</option>';
         products.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.id;
@@ -33,14 +27,30 @@ async function loadProducts() {
 }
 
 function setupEventListeners() {
-    // Botón Principal
     document.getElementById('btn-filter').addEventListener('click', applyFilters);
-    document.getElementById('btn-reset').addEventListener('click', resetFilters);
-
-    // Lógica de Turnos (Cambia las fechas/horas automáticamente)
+    document.getElementById('btn-pdf').addEventListener('click', () => alert("Funcionalidad de PDF pendiente de implementación."));
     document.getElementById('shift-select').addEventListener('change', (e) => {
         handleShiftChange(e.target.value);
     });
+}
+
+function setInitialDefaults() {
+    // Configuración por defecto: Ayer 06:00 a Hoy 06:00
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    document.getElementById('date-start').value = yesterday.toISOString().split('T')[0];
+    document.getElementById('time-start').value = "06:00";
+    
+    document.getElementById('date-end').value = now.toISOString().split('T')[0];
+    document.getElementById('time-end').value = "06:00";
+    
+    document.getElementById('interval-select').value = '1h';
+    document.getElementById('line-select').value = 'ALL';
+    document.getElementById('product-select').value = 'ALL';
+    document.getElementById('curve-type').value = 'stepped'; // Por defecto Escalonada
+    document.getElementById('show-stops-check').checked = false;
 }
 
 function handleShiftChange(shift) {
@@ -49,93 +59,90 @@ function handleShiftChange(shift) {
     const dateEnd = document.getElementById('date-end');
     const timeEnd = document.getElementById('time-end');
     
-    const today = new Date().toISOString().split('T')[0];
-    // Para turno noche que termina mañana
-    const tomorrowObj = new Date();
-    tomorrowObj.setDate(tomorrowObj.getDate() + 1);
-    const tomorrow = tomorrowObj.toISOString().split('T')[0];
+    // Obtenemos la fecha que esté seleccionada actualmente en el "Inicio" como base
+    let baseDate = new Date(dateStart.value);
+    if (isNaN(baseDate)) baseDate = new Date();
+    
+    const baseDateStr = baseDate.toISOString().split('T')[0];
+    
+    // Para turno noche, si empieza hoy, termina mañana
+    const nextDay = new Date(baseDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextDayStr = nextDay.toISOString().split('T')[0];
 
     switch(shift) {
-        case 'morning':
-            dateStart.value = today; timeStart.value = "05:00";
-            dateEnd.value = today; timeEnd.value = "13:00";
+        case 'morning': // 06:00 - 14:00
+            dateStart.value = baseDateStr; timeStart.value = "06:00";
+            dateEnd.value = baseDateStr;   timeEnd.value = "14:00";
             break;
-        case 'afternoon':
-            dateStart.value = today; timeStart.value = "13:00";
-            dateEnd.value = today; timeEnd.value = "21:00";
+        case 'afternoon': // 14:00 - 22:00
+            dateStart.value = baseDateStr; timeStart.value = "14:00";
+            dateEnd.value = baseDateStr;   timeEnd.value = "22:00";
             break;
-        case 'night':
-            dateStart.value = today; timeStart.value = "21:00";
-            dateEnd.value = tomorrow; timeEnd.value = "05:00";
+        case 'night': // 22:00 - 06:00 (del día siguiente)
+            dateStart.value = baseDateStr; timeStart.value = "22:00";
+            dateEnd.value = nextDayStr;    timeEnd.value = "06:00";
             break;
-        case 'all':
-            dateStart.value = today; timeStart.value = "00:00";
-            dateEnd.value = tomorrow; timeEnd.value = "00:00";
+        case 'all': // 06:00 a 06:00 del día sig (Jornada completa)
+            dateStart.value = baseDateStr; timeStart.value = "06:00";
+            dateEnd.value = nextDayStr;    timeEnd.value = "06:00";
             break;
     }
-}
-
-function resetFilters() {
-    const now = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(now.getDate() - 1);
-
-    document.getElementById('date-start').value = yesterday.toISOString().split('T')[0];
-    document.getElementById('time-start').value = "06:00";
-    
-    document.getElementById('date-end').value = now.toISOString().split('T')[0];
-    document.getElementById('time-end').value = now.getHours().toString().padStart(2, '0') + ":00";
-    
-    document.getElementById('interval-select').value = '1h';
-    document.getElementById('line-select').value = 'ALL';
-    document.getElementById('curve-type').value = '0.4';
-    document.getElementById('show-stops-check').checked = false;
-    
-    applyFilters();
 }
 
 async function applyFilters() {
     try {
         showLoading(true);
 
-        // 1. Parametros UI
         const startIso = `${document.getElementById('date-start').value}T${document.getElementById('time-start').value}`;
         const endIso = `${document.getElementById('date-end').value}T${document.getElementById('time-end').value}`;
         const interval = document.getElementById('interval-select').value;
         const line = document.getElementById('line-select').value;
         const prodId = document.getElementById('product-select').value;
 
-        // 2. Opciones visuales
+        // Opciones visuales
         const vizOptions = {
             curveType: document.getElementById('curve-type').value,
             showStops: document.getElementById('show-stops-check').checked,
-            displayMode: document.getElementById('display-mode').value
+            displayMode: document.getElementById('display-mode').value,
+            isAllLines: line === 'ALL'
         };
 
-        // 3. Construir URL (CORRECCIÓN: Usamos fetch directo, no api.js)
+        // Construir URL
         let apiUrl = `/api/dashboard?interval=${interval}&start=${startIso}&end=${endIso}`;
         if (line !== 'ALL') apiUrl += `&lines=${line}`;
         if (prodId !== 'ALL') apiUrl += `&product_id=${prodId}`;
 
-        // CORRECCIÓN AQUÍ: Fetch directo
         const response = await fetch(apiUrl);
-        
         if (!response.ok) {
-            // Intentar leer el error del backend si existe
             const errData = await response.json();
             throw new Error(errData.error || `Error HTTP: ${response.status}`);
         }
         
         const data = await response.json();
 
-        // 4. Actualizar UI
+        // Mostrar contenedores
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('kpi-container').style.display = 'flex';
+        document.getElementById('charts-container').style.display = 'block';
+
+        // Gestión de visibilidad de Paradas (Si son todas las líneas, se ocultan)
+        const downtimeElements = document.querySelectorAll('.downtime-card-group, .downtime-list-section');
+        downtimeElements.forEach(el => {
+            el.style.display = vizOptions.isAllLines ? 'none' : 'block';
+        });
+
+        // Actualizar UI
         updateLastUpdatedTime(data.meta.start, data.meta.end);
         updateKPIs(data.kpis); 
         
-        renderDowntimeTable(data.downtime.events);
+        if (!vizOptions.isAllLines) {
+            renderDowntimeTable(data.downtime.events);
+        }
+        
         renderSummaryTable(data.products);
 
-        // 5. Renderizar Gráficos
+        // Renderizar Gráficos
         const mainCtx = document.getElementById('productionChart').getContext('2d');
         renderProductionChart(mainCtx, data.charts.main, vizOptions, data.downtime.events);
         

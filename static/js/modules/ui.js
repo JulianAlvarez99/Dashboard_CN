@@ -18,6 +18,10 @@ export function updateKPIs(kpis) {
     document.getElementById('kpi-output').innerText = formatNum(kpis.total_output);
     document.getElementById('kpi-downtime-count').innerText = kpis.downtime_count;
     document.getElementById('kpi-downtime-time').innerText = kpis.downtime_total_str; // Ya viene HH:MM:SS del backend
+    const kpiWeight = document.getElementById('kpi-weight');
+    if (kpiWeight) {
+        kpiWeight.innerText = kpis.total_weight_kg + " kg";
+    }
 }
 
 export function updateLastUpdatedTime(startIso, endIso) {
@@ -29,12 +33,8 @@ export function updateLastUpdatedTime(startIso, endIso) {
 export function renderSummaryTable(products) {
     const tbody = document.getElementById('summary-table-body');
     tbody.innerHTML = '';
-    
-    // Ordenar por cantidad desc
     products.sort((a,b) => b.cantidad - a.cantidad);
-
     products.forEach(p => {
-        // Limpieza de nombre
         const name = p.product_name.replace(/_/g, ' ');
         const row = `
             <tr>
@@ -42,6 +42,7 @@ export function renderSummaryTable(products) {
                     <span style="display:inline-block;width:10px;height:10px;background-color:${p.color};border-radius:50%;margin-right:5px;"></span>
                     ${name}
                 </td>
+                <td><span style="display:inline-block;width:15px;height:15px;background-color:${p.color};border:1px solid #ccc;"></span> ${p.color}</td>
                 <td class="text-end fw-bold">${p.cantidad.toLocaleString()}</td>
                 <td class="text-end text-muted">${p.percent}%</td>
             </tr>
