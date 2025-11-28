@@ -2,142 +2,75 @@ import pandas as pd
 import numpy as np
 
 class DataProcessor:
-    """
-    Clase encargada de la lógica de negocio: transformación de datos, 
-    cálculo de KPIs y preparación de estructuras para gráficos.
-    """
+
     @staticmethod
     def filter_by_shift(df, shift):
-        """
-        Filtra el DataFrame basándose en la hora del día según el turno.
-        
-        Args:
-            df (pd.DataFrame): DataFrame con columna 'timestamp'.
-            shift (str): Identificador del turno ('morning', 'afternoon', 'night').
-            
-        Returns:
-            pd.DataFrame: DataFrame filtrado por las horas del turno.
-        """
         if df.empty: return df
-        
-        # Extraemos la hora
         hours = df['timestamp'].dt.hour
-        
-        if shift == 'morning': # 06:00 - 14:00
-            return df[(hours >= 6) & (hours < 14)]
-        elif shift == 'afternoon': # 14:00 - 22:00
-            return df[(hours >= 14) & (hours < 22)]
-        elif shift == 'night': # 22:00 - 06:00
-            return df[(hours >= 22) | (hours < 6)]
+        if shift == 'morning': return df[(hours >= 6) & (hours < 14)]
+        elif shift == 'afternoon': return df[(hours >= 14) & (hours < 22)]
+        elif shift == 'night': return df[(hours >= 22) | (hours < 6)]
         return df
     
     @staticmethod
     def calculate_global_kpis(df, downtime_events):
-        """
-        Calcula los indicadores clave de rendimiento (KPIs) globales.
-        
-        Args:
-            df (pd.DataFrame): DataFrame de producción.
-            downtime_events (list): Lista de diccionarios con eventos de parada.
-            
-        Returns:
-            dict: Diccionario con totales, contadores y strings formateados.
-        """
         if df.empty:
-            return {
-                'total_output': 0,
-                'downtime_count': 0,
-                'downtime_total_str': "00:00:00",
-                'total_weight_kg': 0
-            }
+            return {'total_output': 0, 'downtime_count': 0, 'downtime_total_str': "00:00:00", 'total_weight_kg': 0}
             
-        # Total Salida (Exit Area)
-        # Verificamos que exista la columna antes de filtrar
-        if 'is_exit' in df.columns:
-            total_output = df[df['is_exit']].shape[0]
-        else:
-            total_output = 0
+        if 'is_exit' in df.columns: total_output = df[df['is_exit']].shape[0]
+        else: total_output = 0
         
-        # Calcular Peso Total
         total_weight = 0
-        if 'class_weight' in df.columns and 'is_exit' in df.columns:
-             # Multiplicar cantidad x peso unitario
-             # Filtramos solo entradas válidas
+        if 'class_weight' in df.columns and 'is_exit' in df.columns: # Usamos salida para peso real despachado
              production_df = df[df['is_exit']]
              total_weight = production_df['class_weight'].sum()
 
-        # Métricas de Paradas
         downtime_count = len(downtime_events)
         total_seconds = sum(d['duration_seconds'] for d in downtime_events)
-        
         m, s = divmod(total_seconds, 60)
         h, m = divmod(m, 60)
         downtime_str = "{:02d}:{:02d}:{:02d}".format(int(h), int(m), int(s))
         
+        # CORRECCIÓN: Conversión explícita a tipos nativos (int, float)
         return {
             'total_output': int(total_output),
-            'downtime_count': downtime_count,
+            'downtime_count': int(downtime_count),
             'downtime_total_str': downtime_str,
-            'total_weight_kg': f"{total_weight:,.2f}" # Formato string
+            'total_weight_kg': f"{total_weight:,.2f}"
         }
     
     @staticmethod
     def get_product_chart_data(df, interval='1h', query_start=None, query_end=None):
-        """
-        Genera la estructura de datos para el gráfico de líneas por producto.
-        
-        Args:
-            df (pd.DataFrame): Datos crudos.
-            interval (str): Frecuencia de agrupación (ej: '1h', '15min').
-            query_start (datetime): Inicio del rango de visualización.
-            query_end (datetime): Fin del rango de visualización.
-            
-        Returns:
-            dict: Objeto con 'labels' (eje X) y 'datasets' (series por producto).
-        """
         empty_response = {'labels': [], 'datasets': []}
         if df.empty and not query_start: return empty_response
 
-        # Preparamos df_prod de forma segura
         df_prod = pd.DataFrame()
-
-        # SOLO intentamos filtrar si el DataFrame tiene datos y columnas
         if not df.empty and 'is_exit' in df.columns:
             df_prod = df[df['is_exit']].copy()
-            
             if not df_prod.empty:
                 df_prod.set_index('timestamp', inplace=True)
-                
-                # Lógica de nombres de línea (si existe la columna)
                 if 'line_key' in df_prod.columns and df_prod['line_key'].nunique() > 1:
                     line_map = {'linea_1': 'L1', 'linea_2': 'L2', 'linea_3_semolin': 'L3'}
                     df_prod['product_display'] = df_prod['product_name'] + " (" + df_prod['line_key'].map(line_map).fillna(df_prod['line_key']) + ")"
                 else:
                     df_prod['product_display'] = df_prod['product_name']
 
-        # Normalización Fechas
         try:
-            # Soporte para 1W y 1M (pandas usa 'W' y 'ME')
             pd_interval = interval.replace('1W', 'W').replace('1ME', 'ME').replace('1M', 'ME')
-            
             if query_start: start_norm = pd.Timestamp(query_start).floor(pd_interval) if 'M' not in pd_interval else pd.Timestamp(query_start)
             else: start_norm = pd.Timestamp.now().floor(pd_interval)
-
             if query_end: end_norm = pd.Timestamp(query_end).ceil(pd_interval) if 'M' not in pd_interval else pd.Timestamp(query_end)
             else: end_norm = pd.Timestamp.now().ceil(pd_interval)
         except:
             start_norm = pd.Timestamp(query_start) if query_start else pd.Timestamp.now()
             end_norm = pd.Timestamp(query_end) if query_end else pd.Timestamp.now()
-            pd_interval = interval # Fallback
+            pd_interval = interval
 
-        # Generamos el índice de tiempo completo
         try:
-            full_time_index = pd.date_range(start=start_norm, end=end_norm, freq=interval)
-        except:
-             return empty_response
+            full_time_index = pd.date_range(start=start_norm, end=end_norm, freq=pd_interval)
+        except: return empty_response
 
         datasets = []
-        
         if not df_prod.empty:
             grouped = df_prod.groupby([pd.Grouper(freq=pd_interval), 'product_display']).agg({'id': 'size', 'color': 'first'})
             counts_matrix = grouped['id'].unstack(level=1, fill_value=0)
@@ -145,9 +78,11 @@ class DataProcessor:
             unique_products = df_prod[['product_display', 'color']].drop_duplicates().set_index('product_display')['color'].to_dict()
 
             for prod_name in counts_matrix.columns:
+                # CORRECCIÓN: Asegurar lista de enteros nativos
+                data_values = counts_matrix[prod_name].fillna(0).astype(int).tolist()
                 datasets.append({
                     'label': prod_name,
-                    'data': counts_matrix[prod_name].tolist(),
+                    'data': data_values,
                     'borderColor': unique_products.get(prod_name, '#cccccc'),
                     'backgroundColor': unique_products.get(prod_name, '#cccccc'),
                     'fill': False
@@ -160,14 +95,8 @@ class DataProcessor:
 
     @staticmethod
     def get_entry_exit_comparison(df, interval='1h', query_start=None, query_end=None):
-        """
-        Genera datos para el gráfico de barras comparativo (Entrada vs Salida).
-        """
         if df.empty: return {'labels':[], 'entry':[], 'exit':[], 'diff':[]}
-        
-        # Verificación de seguridad
-        if 'is_entry' not in df.columns or 'is_exit' not in df.columns:
-             return {'labels':[], 'entry':[], 'exit':[], 'diff':[]}
+        if 'is_entry' not in df.columns or 'is_exit' not in df.columns: return {'labels':[], 'entry':[], 'exit':[], 'diff':[]}
         
         pd_interval = interval.replace('1W', 'W').replace('1ME', 'ME').replace('1M', 'ME')
         try:
@@ -179,51 +108,32 @@ class DataProcessor:
         except: return {'labels':[], 'entry':[], 'exit':[], 'diff':[]}
 
         if df.empty:
-             return {
-                'labels': full_time_index.strftime('%d/%m %H:%M').tolist(),
-                'entry': [0]*len(full_time_index), 'exit': [0]*len(full_time_index), 'diff': [0]*len(full_time_index)
-             }
+             return {'labels': full_time_index.strftime('%d/%m %H:%M').tolist(), 'entry': [], 'exit': [], 'diff': []}
         
         df_temp = df.copy()
         df_temp.set_index('timestamp', inplace=True)
         
-        # Usamos el full_time_index para reindexar y asegurar sincronía
         entry_series = df_temp[df_temp['is_entry']].groupby(pd.Grouper(freq=pd_interval)).size().reindex(full_time_index, fill_value=0)
         exit_series = df_temp[df_temp['is_exit']].groupby(pd.Grouper(freq=pd_interval)).size().reindex(full_time_index, fill_value=0)
-        
         diff_series = (entry_series - exit_series).apply(lambda x: x if x > 0 else 0)
         
         fmt = '%d/%m %H:%M'
         if 'D' in interval or 'W' in interval: fmt = '%d/%m/%Y'
 
+        # CORRECCIÓN: Listas de enteros nativos
         return {
             'labels': full_time_index.strftime(fmt).tolist(),
-            'entry': entry_series.tolist(),
-            'exit': exit_series.tolist(),
-            'diff': diff_series.tolist()
+            'entry': entry_series.astype(int).tolist(),
+            'exit': exit_series.astype(int).tolist(),
+            'diff': diff_series.astype(int).tolist()
         }
     
-  
     @staticmethod
     def calculate_downtime(df, threshold_seconds=60, query_start=None, query_end=None):
-        """
-        Detecta paradas (huecos de producción) incluyendo los extremos del intervalo.
-        
-        Args:
-            df (pd.DataFrame): Datos crudos.
-            threshold_seconds (int): Tiempo mínimo en segundos para considerar parada.
-            query_start (datetime): Inicio del filtro (para calcular hueco inicial).
-            query_end (datetime): Fin del filtro (para calcular hueco final).
-            
-        Returns:
-            list: Lista de objetos parada ordenados cronológicamente inverso.
-        """
         if df.empty: return []
         if 'line_key' not in df.columns or 'is_entry' not in df.columns: return []
 
         stops_report = []
-        
-        # Convertir query dates a Timestamp para comparar
         ts_start = pd.Timestamp(query_start) if query_start else None
         ts_end = pd.Timestamp(query_end) if query_end else None
         limit = pd.Timedelta(seconds=threshold_seconds)
@@ -232,7 +142,7 @@ class DataProcessor:
             line_df = df[(df['line_key'] == line) & (df['is_entry'])].sort_values('timestamp')
             if line_df.empty: continue
             
-            # 1. Paradas Intermedias (Huecos entre bolsas)
+            # 1. Paradas Intermedias
             line_df['delta'] = line_df['timestamp'].diff()
             stops = line_df[line_df['delta'] > limit]
             
@@ -246,11 +156,10 @@ class DataProcessor:
                     'duration_formatted': str(duration).split('.')[0]
                 })
             
-            # 2. Parada al Inicio (Desde 'query_start' hasta 1ra bolsa)
+            # 2. Parada al Inicio
             if ts_start:
                 first_detection = line_df['timestamp'].iloc[0]
                 start_gap = first_detection - ts_start
-                
                 if start_gap > limit:
                     stops_report.append({
                         'line': line,
@@ -260,11 +169,10 @@ class DataProcessor:
                         'duration_formatted': str(start_gap).split('.')[0]
                     })
 
-            # 3. Parada al Final (Desde ultima bolsa hasta 'query_end')
+            # 3. Parada al Final
             if ts_end:
                 last_detection = line_df['timestamp'].iloc[-1]
                 end_gap = ts_end - last_detection
-                
                 if end_gap > limit:
                     stops_report.append({
                         'line': line,
@@ -278,19 +186,14 @@ class DataProcessor:
 
     @staticmethod
     def get_product_distribution(df):
-        """
-        Calcula la distribución porcentual de productos (Torta).
-        """
-        if df.empty: return []
-        # Usamos is_exit para contar producto terminado real
-        if 'is_exit' not in df.columns: return []
+        if df.empty or 'is_exit' not in df.columns: return []
         total = df[df['is_exit']].shape[0]
-        stats = df[df['is_exit']].groupby('product_name').agg({
-            'id': 'count',
-            'color': 'first' 
-        }).reset_index()
+        stats = df[df['is_exit']].groupby('product_name').agg({'id': 'count', 'color': 'first'}).reset_index()
         stats.rename(columns={'id': 'cantidad'}, inplace=True)
         stats['percent'] = (stats['cantidad'] / total * 100).round(2) if total > 0 else 0
+        
+        # CORRECCIÓN: Tipos nativos
+        stats['cantidad'] = stats['cantidad'].astype(int)
+        stats['percent'] = stats['percent'].astype(float)
+        
         return stats.to_dict(orient='records')
-    
-# Fin de data_processor.py
