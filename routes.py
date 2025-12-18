@@ -4,21 +4,47 @@ from flask_login import login_required, current_user
 from db_manager import DataManager
 from data_processor import DataProcessor
 import security_logger
-from settings_manager import SettingsManager 
+from settings_manager import SettingsManager
+from config import Config # Importar Config 
 
 api_bp = Blueprint('api', __name__)
-db_manager = DataManager()
+# 1. ELIMINAR O COMENTAR ESTA LÍNEA GLOBAL:
+# db_manager = DataManager()  <-- ESTO ES LO QUE PONE LENTO EL INICIO
 
-def _adjust_visualization_range_by_shift(start_dt, end_dt, shift):
+
+# 2. Reemplazar por una variable global inicializada en None
+_db_manager_instance = None
+
+def get_db_manager():
+    """Patrón Singleton Lazy: Solo conecta a la BD cuando realmente se pide un dato."""
+    global _db_manager_instance
+    if _db_manager_instance is None:
+        print("⚡ Inicializando DataManager por primera vez...")
+        _db_manager_instance = DataManager()
+    return _db_manager_instance
+
+def _adjust_visualization_range_by_shift(start_dt, end_dt, shift_key):
+    # Si el rango es mayor a 25 horas, no ajustamos visualmente
     if (end_dt - start_dt).total_seconds() > 90000: return start_dt, end_dt
+    
+    if shift_key not in Config.SHIFTS:
+        return start_dt, end_dt
+
+    shift_cfg = Config.SHIFTS[shift_key]
     base_date = start_dt.date()
-    if shift == 'morning':
-        return datetime.combine(base_date, datetime.min.time()) + timedelta(hours=6), datetime.combine(base_date, datetime.min.time()) + timedelta(hours=14)
-    elif shift == 'afternoon':
-        return datetime.combine(base_date, datetime.min.time()) + timedelta(hours=14), datetime.combine(base_date, datetime.min.time()) + timedelta(hours=22)
-    elif shift == 'night':
-        return datetime.combine(base_date, datetime.min.time()) + timedelta(hours=22), datetime.combine(base_date, datetime.min.time()) + timedelta(days=1, hours=6)
-    return start_dt, end_dt
+    
+    # Ajustamos start
+    viz_start = datetime.combine(base_date, datetime.min.time()) + timedelta(hours=shift_cfg['start'])
+    
+    # Ajustamos end
+    if shift_cfg['start'] < shift_cfg['end']:
+        # Turno mismo día (ej: 06 a 14)
+        viz_end = datetime.combine(base_date, datetime.min.time()) + timedelta(hours=shift_cfg['end'])
+    else:
+        # Turno cruza medianoche (ej: 22 a 06 del día siguiente)
+        viz_end = datetime.combine(base_date, datetime.min.time()) + timedelta(days=1, hours=shift_cfg['end'])
+
+    return viz_start, viz_end
 
 # --- NUEVAS RUTAS DE CONFIGURACIÓN DE VISIBILIDAD ---
 
@@ -64,6 +90,11 @@ def get_dashboard_data():
         product_id_param = request.args.get('product_id')
         shift_param = request.args.get('shift')
         
+        try:
+            threshold_seconds = int(request.args.get('threshold', 60))
+        except ValueError:
+            threshold_seconds = 60
+
         # 2. Parseo de Fechas
         if end_str: end_date = datetime.fromisoformat(end_str)
         else: end_date = datetime.now()
@@ -83,7 +114,8 @@ def get_dashboard_data():
 
         # 3. Obtención de Datos
         selected_lines = lines_param.split(',') if lines_param and lines_param != 'ALL' else None
-        df = db_manager.get_raw_production_data(start_date, end_date, selected_lines)
+        manager = get_db_manager() 
+        df = manager.get_raw_production_data(start_date, end_date, selected_lines)
         
         # 4. Filtrado
         if not df.empty:
@@ -98,7 +130,7 @@ def get_dashboard_data():
             viz_start, viz_end = _adjust_visualization_range_by_shift(start_date, end_date, shift_param)
 
         # 6. Procesamiento
-        downtime = DataProcessor.calculate_downtime(df, 300, viz_start, viz_end)
+        downtime = DataProcessor.calculate_downtime(df, threshold_seconds, viz_start, viz_end)
         kpis = DataProcessor.calculate_global_kpis(df, downtime)
         
         chart_prod = DataProcessor.get_product_chart_data(df, interval, viz_start, viz_end)
@@ -126,7 +158,8 @@ def get_dashboard_data():
 @login_required
 def get_products_list():
     try:
-        classes = db_manager.metadata_cache.get('classes', {})
+        manager = get_db_manager() 
+        classes = manager.metadata_cache.get('classes', {})
         product_list = []
         for class_id, data in classes.items():
             product_list.append({'id': class_id, 'name': data['class_name'], 'color': data['color']})

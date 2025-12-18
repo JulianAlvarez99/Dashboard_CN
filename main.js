@@ -170,11 +170,11 @@ function setInitialDefaults() {
     document.getElementById('time-start').value = "06:00";
     document.getElementById('date-end').value = now.toISOString().split('T')[0];
     document.getElementById('time-end').value = "06:00";
-    document.getElementById('interval-select').value = '1h';
+    document.getElementById('interval-select').value = '15min';
     document.getElementById('line-select').value = 'ALL';
     document.getElementById('product-select').value = 'ALL';
-    document.getElementById('curve-type').value = 'stepped'; 
-    document.getElementById('show-stops-check').checked = false;
+    document.getElementById('curve-type').value = '0.4'; 
+    document.getElementById('show-stops-check').checked = true;
 }
 
 // --- FUNCIONES PDF ---
@@ -243,6 +243,7 @@ async function applyFilters() {
         const line = document.getElementById('line-select').value;
         const prodId = document.getElementById('product-select').value;
         const shift = document.getElementById('shift-select').value;
+        const thresholdVal = document.getElementById('downtime-threshold').value || 60;
 
         const vizOptions = {
             curveType: document.getElementById('curve-type').value,
@@ -256,6 +257,7 @@ async function applyFilters() {
         if (line !== 'ALL') apiUrl += `&lines=${line}`;
         if (prodId !== 'ALL') apiUrl += `&product_id=${prodId}`;
         if (shift !== 'all') apiUrl += `&shift=${shift}`;
+        apiUrl += `&threshold=${thresholdVal}`;
 
         const response = await fetch(apiUrl);
         if (!response.ok) {
@@ -324,42 +326,48 @@ async function applyFilters() {
  * - La fecha de inicio no puede ser mayor a la de fin.
  */
 function setupDateConstraints() {
-    const startInput = document.getElementById('date-start');
-    const endInput = document.getElementById('date-end');
+    const dateStart = document.getElementById('date-start');
+    const timeStart = document.getElementById('time-start');
+    const dateEnd = document.getElementById('date-end');
+    const timeEnd = document.getElementById('time-end');
 
-    const syncDates = () => {
-        const startVal = startInput.value;
-        const endVal = endInput.value;
+    const validateConstraints = () => {
+        const dStartVal = dateStart.value;
+        const dEndVal = dateEnd.value;
+        const tStartVal = timeStart.value;
+        const tEndVal = timeEnd.value;
 
-        // 1. Configurar el mínimo de la fecha fin = fecha inicio seleccionada
-        if (startVal) {
-            endInput.min = startVal;
-            
-            // Corrección automática: si la fecha fin actual quedó "atrás", la empujamos
-            if (endVal && endVal < startVal) {
-                endInput.value = startVal;
-            }
-        } else {
-            endInput.removeAttribute('min');
+        // 1. Validar Fechas (Días)
+        if (dStartVal) {
+            dateEnd.min = dStartVal;
+            if (dEndVal && dEndVal < dStartVal) dateEnd.value = dStartVal;
         }
 
-        // 2. Configurar el máximo de la fecha inicio = fecha fin seleccionada
-        if (endVal) {
-            startInput.max = endVal;
+        if (dEndVal) {
+            dateStart.max = dEndVal;
+            if (dStartVal && dStartVal > dEndVal) dateStart.value = dEndVal;
+        }
+
+        // 2. Validar Horas (Solo si es el mismo día)
+        if (dStartVal && dEndVal && dStartVal === dEndVal) {
+            // Si el día es igual, la hora fin debe ser mayor a hora inicio
+            timeEnd.min = tStartVal;
             
-            // Corrección automática: si la fecha inicio actual quedó "adelante", la empujamos
-            if (startVal && startVal > endVal) {
-                startInput.value = endVal;
+            if (tEndVal && tStartVal && tEndVal < tStartVal) {
+                // Si el usuario pone una hora fin menor, la corregimos o la igualamos
+                timeEnd.value = tStartVal; 
             }
         } else {
-            startInput.removeAttribute('max');
+            // Si son días distintos, liberamos restricciones horarias
+            timeEnd.removeAttribute('min');
         }
     };
 
-    // Escuchar cambios en ambos inputs
-    startInput.addEventListener('change', syncDates);
-    endInput.addEventListener('change', syncDates);
+    // Escuchar cambios en los 4 inputs
+    dateStart.addEventListener('change', validateConstraints);
+    dateEnd.addEventListener('change', validateConstraints);
+    timeStart.addEventListener('change', validateConstraints);
+    timeEnd.addEventListener('change', validateConstraints);
 
-    // Ejecutar validación inicial inmediatamente (para aplicar a los valores por defecto)
-    syncDates();
+    validateConstraints(); // Ejecución inicial
 }

@@ -53,6 +53,13 @@ class Config:
         'database': os.getenv('AUTH_MYSQL_DB')
     }
 
+    # Configuración de Turnos
+    SHIFTS = {
+        'morning':   {'start': 5,  'end': 14, 'label': 'Mañana (06-14)'},
+        'afternoon': {'start': 14, 'end': 22, 'label': 'Tarde (14-22)'},
+        'night':     {'start': 22, 'end': 6,  'label': 'Noche (22-06)'}
+    }
+
 def get_db_connection():
     try:
         return pymysql.connect(

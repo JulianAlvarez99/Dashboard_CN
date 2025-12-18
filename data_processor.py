@@ -1,27 +1,49 @@
 import pandas as pd
 import numpy as np
+from config import Config # Importar Config
 
 class DataProcessor:
 
     @staticmethod
-    def filter_by_shift(df, shift):
-        if df.empty: return df
+    def filter_by_shift(df, shift_key):
+        """
+        Filtra el DataFrame según los horarios definidos en Config.SHIFTS.
+        Soporta rangos que cruzan la medianoche (ej: 22 a 06).
+        """
+        if df.empty or shift_key not in Config.SHIFTS: 
+            return df
+            
+        shift_cfg = Config.SHIFTS[shift_key]
+        start_h = shift_cfg['start']
+        end_h = shift_cfg['end']
+        
         hours = df['timestamp'].dt.hour
-        if shift == 'morning': return df[(hours >= 6) & (hours < 14)]
-        elif shift == 'afternoon': return df[(hours >= 14) & (hours < 22)]
-        elif shift == 'night': return df[(hours >= 22) | (hours < 6)]
-        return df
+        
+        # Lógica para turnos normales (ej: 06 a 14) vs cruce de medianoche (ej: 22 a 06)
+        if start_h < end_h:
+            return df[(hours >= start_h) & (hours < end_h)]
+        else:
+            # Caso Noche: horas mayores a 22 O horas menores a 6
+            return df[(hours >= start_h) | (hours < end_h)]
     
+    @staticmethod
+    def format_int_ar(value):
+        """Formatea enteros con punto de miles: 1250 -> '1.250'"""
+        try:
+            return "{:,}".format(int(value)).replace(',', '.')
+        except:
+            return str(value)
+        
     @staticmethod
     def calculate_global_kpis(df, downtime_events):
         if df.empty:
-            return {'total_output': 0, 'downtime_count': 0, 'downtime_total_str': "00:00:00", 'total_weight_kg': 0}
+            return {'total_output': 0, 'downtime_count': 0, 'downtime_total_str': "00:00:00", 'total_weight_kg': "0"}
             
         if 'is_exit' in df.columns: total_output = df[df['is_exit']].shape[0]
         else: total_output = 0
         
         total_weight = 0
-        if 'class_weight' in df.columns and 'is_exit' in df.columns: # Usamos salida para peso real despachado
+        if 'class_weight' in df.columns and 'is_exit' in df.columns:
              production_df = df[df['is_exit']]
              total_weight = production_df['class_weight'].sum()
 
@@ -31,12 +53,17 @@ class DataProcessor:
         h, m = divmod(m, 60)
         downtime_str = "{:02d}:{:02d}:{:02d}".format(int(h), int(m), int(s))
         
-        # CORRECCIÓN: Conversión explícita a tipos nativos (int, float)
         return {
+            # CORRECCIÓN IMPORTANTE:
+            # total_output lo enviamos como INT puro. 
+            # ui.js usa numFmt (es-AR) que pondrá el punto automáticamente.
             'total_output': int(total_output),
+            
             'downtime_count': int(downtime_count),
             'downtime_total_str': downtime_str,
-            'total_weight_kg': f"{total_weight:,.2f}"
+            
+            # total_weight_kg NO usa numFmt en el frontend, así que lo formateamos aquí como STRING.
+            'total_weight_kg': DataProcessor.format_int_ar(total_weight)
         }
     
     @staticmethod
@@ -188,12 +215,26 @@ class DataProcessor:
     def get_product_distribution(df):
         if df.empty or 'is_exit' not in df.columns: return []
         total = df[df['is_exit']].shape[0]
-        stats = df[df['is_exit']].groupby('product_name').agg({'id': 'count', 'color': 'first'}).reset_index()
+        
+        stats = df[df['is_exit']].groupby('product_name').agg({
+            'id': 'count', 
+            'color': 'first',
+            'class_weight': 'first'
+        }).reset_index()
+        
         stats.rename(columns={'id': 'cantidad'}, inplace=True)
         stats['percent'] = (stats['cantidad'] / total * 100).round(2) if total > 0 else 0
         
-        # CORRECCIÓN: Tipos nativos
         stats['cantidad'] = stats['cantidad'].astype(int)
         stats['percent'] = stats['percent'].astype(float)
         
-        return stats.to_dict(orient='records')
+        results = stats.to_dict(orient='records')
+        for r in results:
+            peso_unitario = r.get('class_weight', 0)
+            cantidad = r.get('cantidad', 0)
+            total_peso_clase = peso_unitario * cantidad
+            
+            # CORRECCIÓN: Formato entero sin decimales
+            r['total_weight_formatted'] = DataProcessor.format_int_ar(total_peso_clase)
+            
+        return results

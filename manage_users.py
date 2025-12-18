@@ -52,7 +52,7 @@ def hash_password(password):
     return hashed.decode('utf-8')
 
 
-def create_user(username, password, privilege='cliente', name_business='Chacabuco'):
+def create_user(username, password, privilege='cliente', name_business='Camet'):
     """
     Crea un nuevo usuario en la base de datos
     
@@ -197,7 +197,7 @@ def interactive_menu():
     """Menú interactivo para gestión de usuarios"""
     while True:
         print("\n" + "=" * 80)
-        print("GESTIÓN DE USUARIOS - Dashboard Chacabuco")
+        print("GESTIÓN DE USUARIOS - Dashboards")
         print("=" * 80)
         print("\n1. Crear nuevo usuario")
         print("2. Actualizar contraseña")
@@ -218,10 +218,12 @@ def interactive_menu():
             privilege = 'cliente' if priv_choice == '1' else 'administrador'
             
             print("\nEmpresa:")
-            print("  1. Chacabuco")
-            print("  2. Camet")
-            biz_choice = input("Selecciona (1-2): ").strip()
-            name_business = 'Chacabuco' if biz_choice == '1' else 'Camet'
+            print("  1. Camet")
+            print("  2. Solimeno")
+            print("  3. Chacabuco")
+            print("  4. CentralNorte")
+            biz_choice = input("Selecciona (1-4): ").strip()
+            name_business = 'Camet' if biz_choice == '1' else 'Solimeno' if biz_choice == '2' else 'Chacabuco' if biz_choice == '3' else 'CentralNorte'
             
             # Opción de generar contraseña aleatoria o ingresar manualmente
             print("\nContraseña:")
@@ -326,7 +328,7 @@ if __name__ == '__main__':
     import sys
     
     print("=" * 80)
-    print("ADMINISTRACIÓN DE USUARIOS - Dashboard Chacabuco")
+    print("ADMINISTRACIÓN DE USUARIOS - Base de Datos de Autenticación")
     print("=" * 80)
     
     # Verificar configuración

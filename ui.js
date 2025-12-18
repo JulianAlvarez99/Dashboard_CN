@@ -65,19 +65,20 @@ export function renderSummaryTable(products) {
     
     tbody.innerHTML = '';
     
-    // Ordenar por cantidad descendente para mostrar los más importantes arriba
     products.sort((a, b) => b.cantidad - a.cantidad);
 
     products.forEach(p => {
         const name = p.product_name.replace(/_/g, ' ');
+        // CAMBIO: Default a '0' simple
+        const totalWeight = p.total_weight_formatted || '0';
         
-        // Creamos la fila con el indicador de color visual (círculo)
         const row = `
             <tr>
                 <td>
                     <span style="display:inline-block; width:12px; height:12px; background-color:${p.color}; border-radius:50%; margin-right:8px; border:1px solid #ccc;"></span>
                     ${name}
                 </td>
+                <td class="text-center text-muted">${totalWeight} kg</td>
                 <td class="text-end fw-bold">${numFmt.format(p.cantidad)}</td>
                 <td class="text-end text-muted">${p.percent}%</td>
             </tr>
