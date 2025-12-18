@@ -131,7 +131,7 @@ class DataProcessor:
     @staticmethod
     def calculate_downtime(df, threshold_seconds=60, query_start=None, query_end=None):
         if df.empty: return []
-        if 'line_key' not in df.columns or 'is_entry' not in df.columns: return []
+        if 'line_key' not in df.columns or 'is_exit' not in df.columns: return []
 
         stops_report = []
         ts_start = pd.Timestamp(query_start) if query_start else None
@@ -139,7 +139,7 @@ class DataProcessor:
         limit = pd.Timedelta(seconds=threshold_seconds)
 
         for line in df['line_key'].unique():
-            line_df = df[(df['line_key'] == line) & (df['is_entry'])].sort_values('timestamp')
+            line_df = df[(df['line_key'] == line) & (df['is_exit'])].sort_values('timestamp')
             if line_df.empty: continue
             
             # 1. Paradas Intermedias
