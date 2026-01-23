@@ -173,8 +173,4 @@ Actualiza la configuración global de la UI (Requiere rol Administrador).
 
 -----
 
-## 👥 Créditos
-
-Desarrollado para **Central Norte** / **Camet**.
-
   * **Tecnologías:** Flask, Pandas, Chart.js, Bootstrap 5.
