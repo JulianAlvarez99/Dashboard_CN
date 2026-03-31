@@ -14,17 +14,17 @@ class DataProcessor:
             return df
             
         shift_cfg = Config.SHIFTS[shift_key]
-        start_h = shift_cfg['start']
-        end_h = shift_cfg['end']
+        start_t = shift_cfg['start']
+        end_t = shift_cfg['end']
         
-        hours = df['timestamp'].dt.hour
+        times = df['timestamp'].dt.time
         
-        # Lógica para turnos normales (ej: 06 a 14) vs cruce de medianoche (ej: 22 a 06)
-        if start_h < end_h:
-            return df[(hours >= start_h) & (hours < end_h)]
+        # Lógica para turnos normales vs cruce de medianoche
+        if start_t < end_t:
+            return df[(times >= start_t) & (times < end_t)]
         else:
-            # Caso Noche: horas mayores a 22 O horas menores a 6
-            return df[(hours >= start_h) | (hours < end_h)]
+            # Caso Noche: horas mayores al inicio O horas menores al fin
+            return df[(times >= start_t) | (times < end_t)]
     
     @staticmethod
     def format_int_ar(value):

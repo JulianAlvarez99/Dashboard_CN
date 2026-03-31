@@ -1,22 +1,35 @@
 /* static/js/main.js */
 
-import { renderProductionChart, renderComparisonChart, renderProductPieChart } from './charts.js';
-import { updateKPIs, renderDowntimeTable, renderSummaryTable, updateLastUpdatedTime, showLoading } from './ui.js';
+import { renderProductionChart, renderComparisonChart, renderProductPieChart } from './charts.js?v=2';
+import { updateKPIs, renderDowntimeTable, renderSummaryTable, updateLastUpdatedTime, showLoading } from './ui.js?v=2';
 
 // Globales
 let currentPdfBlobUrl = null;
 let pdfModalInstance = null;
 
+// Helper para limpiar nombres de productos ("A_Harina_Roja..." -> "Harina Roja...")
+function formatProductName(rawName) {
+    if (!rawName || typeof rawName !== 'string') return rawName;
+    const firstUnderscoreIdx = rawName.indexOf('_');
+    if (firstUnderscoreIdx === -1) return rawName;
+
+    // Quita lo que está antes del primer '_' (inclusivo)
+    const afterFirst = rawName.substring(firstUnderscoreIdx + 1);
+
+    // Reemplaza los '_' restantes por espacios
+    return afterFirst.replace(/_/g, ' ');
+}
+
 // Configuración Global en memoria (Estructura Dual)
 let globalUiSettings = {
-    'card-evolution':    {'admin': true, 'client': true},
-    'card-balance':      {'admin': true, 'client': true},
-    'card-distribution': {'admin': true, 'client': true},
-    'card-downtime':     {'admin': true, 'client': true}
+    'card-evolution': { 'admin': true, 'client': true },
+    'card-balance': { 'admin': true, 'client': true },
+    'card-distribution': { 'admin': true, 'client': true },
+    'card-downtime': { 'admin': true, 'client': true }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    loadProducts(); 
+    loadProducts();
     setupEventListeners();
     setInitialDefaults();
     setupDateConstraints();
@@ -38,17 +51,17 @@ async function fetchAndApplySettings() {
         const response = await fetch(window.API_URLS.settings);
         if (response.ok) {
             globalUiSettings = await response.json();
-            
+
             // Actualizar estado de los checkboxes (Solo visual para Admin)
             document.querySelectorAll('.visibility-check').forEach(check => {
                 const targetCard = check.dataset.target; // "card-evolution"
                 const targetRole = check.dataset.role;   // "admin" o "client"
-                
+
                 if (globalUiSettings[targetCard] && globalUiSettings[targetCard].hasOwnProperty(targetRole)) {
                     check.checked = globalUiSettings[targetCard][targetRole];
                 }
             });
-            
+
             applyVisibilityRules();
         }
     } catch (e) {
@@ -63,10 +76,10 @@ async function fetchAndApplySettings() {
 async function saveSettingsToServer() {
     // Reconstruimos el objeto settings basado en el DOM
     const newSettings = {
-        'card-evolution':    {'admin': true, 'client': true},
-        'card-balance':      {'admin': true, 'client': true},
-        'card-distribution': {'admin': true, 'client': true},
-        'card-downtime':     {'admin': true, 'client': true}
+        'card-evolution': { 'admin': true, 'client': true },
+        'card-balance': { 'admin': true, 'client': true },
+        'card-distribution': { 'admin': true, 'client': true },
+        'card-downtime': { 'admin': true, 'client': true }
     };
 
     document.querySelectorAll('.visibility-check').forEach(check => {
@@ -81,7 +94,7 @@ async function saveSettingsToServer() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newSettings)
         });
-        
+
         if (response.ok) {
             globalUiSettings = newSettings;
             applyVisibilityRules();
@@ -102,7 +115,7 @@ async function saveSettingsToServer() {
 function applyVisibilityRules() {
     // El rol del usuario actual ('admin' o 'client')
     const userRole = window.CURRENT_USER_ROLE || 'client';
-    
+
     // Verificamos si estamos viendo "Todas las líneas"
     // Si estamos en ALL, forzamos ocultar datos de paradas
     const lineSelect = document.getElementById('line-select');
@@ -125,7 +138,7 @@ function applyVisibilityRules() {
     // APLICAR REGLA DE "TODAS LAS LÍNEAS" A LOS KPIs DE PARADAS TAMBIÉN
     const kpiCount = document.getElementById('kpi-card-downtime-count');
     const kpiTime = document.getElementById('kpi-card-downtime-time');
-    
+
     if (kpiCount) kpiCount.style.display = isAllLines ? 'none' : 'block';
     if (kpiTime) kpiTime.style.display = isAllLines ? 'none' : 'block';
 }
@@ -141,7 +154,7 @@ async function loadProducts() {
         products.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.id;
-            opt.text = p.name;
+            opt.text = formatProductName(p.name);
             select.appendChild(opt);
         });
     } catch (e) {
@@ -152,14 +165,73 @@ async function loadProducts() {
 function setupEventListeners() {
     document.getElementById('btn-filter').addEventListener('click', applyFilters);
     document.getElementById('btn-pdf').addEventListener('click', openPDFModal);
-    
+
     document.getElementById('btn-refresh-preview').addEventListener('click', generatePDFPreview);
     document.getElementById('btn-download-final').addEventListener('click', downloadGeneratedPDF);
-    
+
     // Listener para los checkboxes de configuración (Solo Admin)
     document.querySelectorAll('.visibility-check').forEach(check => {
         check.addEventListener('change', saveSettingsToServer);
     });
+
+    const shiftSelect = document.getElementById('shift-select');
+    if (shiftSelect) {
+        shiftSelect.addEventListener('change', handleShiftChange);
+    }
+}
+
+function handleShiftChange(e) {
+    const shift = e.target.value;
+    const timeStart = document.getElementById('time-start');
+    const timeEnd = document.getElementById('time-end');
+    const dateStart = document.getElementById('date-start');
+    const dateEnd = document.getElementById('date-end');
+    
+    if (!timeStart || !timeEnd) return;
+
+    if (shift === 'morning') {
+        timeStart.value = '05:45';
+        timeEnd.value = '13:30';
+        if (dateStart && dateEnd) {
+            dateEnd.value = dateStart.value;
+        }
+    } else if (shift === 'afternoon') {
+        timeStart.value = '13:30';
+        timeEnd.value = '21:30';
+        if (dateStart && dateEnd) {
+            dateEnd.value = dateStart.value;
+        }
+    } else if (shift === 'night') {
+        timeStart.value = '21:30';
+        timeEnd.value = '05:45';
+        if (dateStart && dateEnd) {
+            const parts = dateStart.value.split('-');
+            const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
+            dObj.setDate(dObj.getDate() + 1);
+            const y = dObj.getFullYear();
+            const m = String(dObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dObj.getDate()).padStart(2, '0');
+            dateEnd.value = `${y}-${m}-${d}`;
+        }
+    } else if (shift === 'all') {
+        timeStart.value = '05:45';
+        timeEnd.value = '05:45';
+        if (dateStart && dateEnd) {
+            const parts = dateStart.value.split('-');
+            const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
+            dObj.setDate(dObj.getDate() + 1);
+            const y = dObj.getFullYear();
+            const m = String(dObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dObj.getDate()).padStart(2, '0');
+            dateEnd.value = `${y}-${m}-${d}`;
+        }
+    }
+    
+    // Disparar evento para que setupDateConstraints vuelva a validar
+    timeStart.dispatchEvent(new Event('change'));
+
+    // Actualizar gráficos y labels inmediatamente
+    applyFilters();
 }
 
 function setInitialDefaults() {
@@ -167,14 +239,14 @@ function setInitialDefaults() {
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     document.getElementById('date-start').value = yesterday.toISOString().split('T')[0];
-    document.getElementById('time-start').value = "06:00";
+    document.getElementById('time-start').value = "05:45";
     document.getElementById('date-end').value = now.toISOString().split('T')[0];
-    document.getElementById('time-end').value = "06:00";
+    document.getElementById('time-end').value = "05:45";
     document.getElementById('interval-select').value = '15min';
     document.getElementById('line-select').value = 'ALL';
     document.getElementById('product-select').value = 'ALL';
-    document.getElementById('curve-type').value = '0.4'; 
-    document.getElementById('show-stops-check').checked = true;
+    document.getElementById('curve-type').value = '0.4';
+    document.getElementById('show-stops-check').checked = false;
 }
 
 // --- FUNCIONES PDF ---
@@ -201,7 +273,7 @@ function generatePDFPreview() {
     };
     document.body.classList.add('generating-pdf');
     html2pdf().set(opt).from(element).output('bloburl')
-        .then(function(pdfUrl) {
+        .then(function (pdfUrl) {
             currentPdfBlobUrl = pdfUrl;
             iframe.src = pdfUrl;
             document.body.classList.remove('generating-pdf');
@@ -264,16 +336,28 @@ async function applyFilters() {
             const errData = await response.json();
             throw new Error(errData.error || `Error HTTP: ${response.status}`);
         }
-        
+
         const data = await response.json();
+
+        // Parsear nombres de productos para el FRONT
+        if (data.products && Array.isArray(data.products)) {
+            data.products.forEach(p => {
+                if (p.product_name) p.product_name = formatProductName(p.product_name);
+            });
+        }
+        if (data.charts && data.charts.main && data.charts.main.datasets) {
+            data.charts.main.datasets.forEach(ds => {
+                if (ds.label) ds.label = formatProductName(ds.label);
+            });
+        }
 
         document.getElementById('empty-state').style.display = 'none';
         document.getElementById('kpi-container').style.display = 'flex';
         document.getElementById('charts-container').style.display = 'block';
 
         updateLastUpdatedTime(data.meta.start, data.meta.end);
-        updateKPIs(data.kpis); 
-        
+        updateKPIs(data.kpis);
+
         // --- RENDERIZADO MODULAR Y FILTRADO POR ROL ---
         const userRole = window.CURRENT_USER_ROLE || 'client';
 
@@ -300,13 +384,13 @@ async function applyFilters() {
         // Regla: Config dice visible Y no estamos viendo todas las líneas
         const configPermits = globalUiSettings['card-downtime'][userRole];
         const shouldShowDowntimeTable = configPermits && !vizOptions.isAllLines;
-        
+
         const downtimeContainer = document.getElementById('card-downtime');
         if (downtimeContainer) {
-             downtimeContainer.style.display = shouldShowDowntimeTable ? 'block' : 'none';
-             if (shouldShowDowntimeTable) {
-                 renderDowntimeTable(data.downtime.events);
-             }
+            downtimeContainer.style.display = shouldShowDowntimeTable ? 'block' : 'none';
+            if (shouldShowDowntimeTable) {
+                renderDowntimeTable(data.downtime.events);
+            }
         }
 
         // Aplicar reglas visuales finales (para KPIs de paradas y ocultar contenedores vacíos)
@@ -352,10 +436,10 @@ function setupDateConstraints() {
         if (dStartVal && dEndVal && dStartVal === dEndVal) {
             // Si el día es igual, la hora fin debe ser mayor a hora inicio
             timeEnd.min = tStartVal;
-            
+
             if (tEndVal && tStartVal && tEndVal < tStartVal) {
                 // Si el usuario pone una hora fin menor, la corregimos o la igualamos
-                timeEnd.value = tStartVal; 
+                timeEnd.value = tStartVal;
             }
         } else {
             // Si son días distintos, liberamos restricciones horarias

@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import pymysql
 from sqlalchemy import create_engine
 import urllib.parse
+from datetime import time
 
 # --- FIX PARA CPANEL: Cargar .env con ruta absoluta ---
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -41,7 +42,7 @@ class Config:
     LINES_CONFIG = {
         'linea_1': {'table': 'linea_1', 'entry_area': 12, 'exit_area': 11, 'label': 'Línea 1'},
         'linea_2': {'table': 'linea_2', 'entry_area': 23, 'exit_area': 24, 'label': 'Línea 2'},
-        'linea_3': {'table': 'linea_3_semolin', 'entry_area': 1, 'exit_area': 2, 'label': 'Línea 3 Semolín'} 
+        'linea_3': {'table': 'linea_3_semolin', 'entry_area': 1, 'exit_area': 25, 'label': 'Línea 3 Semolín'} 
     }
 
     # Base de Datos de Autenticación
@@ -55,9 +56,9 @@ class Config:
 
     # Configuración de Turnos
     SHIFTS = {
-        'morning':   {'start': 5,  'end': 14, 'label': 'Mañana (06-14)'},
-        'afternoon': {'start': 14, 'end': 22, 'label': 'Tarde (14-22)'},
-        'night':     {'start': 22, 'end': 6,  'label': 'Noche (22-06)'}
+        'morning':   {'start': time(5, 45),  'end': time(13, 30), 'label': 'Mañana (05:45-13:30)'},
+        'afternoon': {'start': time(13, 30), 'end': time(21, 30), 'label': 'Tarde (13:30-21:30)'}
+        # 'night':     {'start': time(21, 30), 'end': time(5, 45),  'label': 'Noche (21:30-05:45)'}
     }
 
 def get_db_connection():

@@ -1,8 +1,6 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from flask_login import login_required, current_user 
-from db_manager import DataManager
-from data_processor import DataProcessor
 import security_logger
 from settings_manager import SettingsManager
 from config import Config # Importar Config 
@@ -20,6 +18,7 @@ def get_db_manager():
     global _db_manager_instance
     if _db_manager_instance is None:
         print("⚡ Inicializando DataManager por primera vez...")
+        from db_manager import DataManager
         _db_manager_instance = DataManager()
     return _db_manager_instance
 
@@ -34,15 +33,15 @@ def _adjust_visualization_range_by_shift(start_dt, end_dt, shift_key):
     base_date = start_dt.date()
     
     # Ajustamos start
-    viz_start = datetime.combine(base_date, datetime.min.time()) + timedelta(hours=shift_cfg['start'])
+    viz_start = datetime.combine(base_date, shift_cfg['start'])
     
     # Ajustamos end
     if shift_cfg['start'] < shift_cfg['end']:
-        # Turno mismo día (ej: 06 a 14)
-        viz_end = datetime.combine(base_date, datetime.min.time()) + timedelta(hours=shift_cfg['end'])
+        # Turno mismo día
+        viz_end = datetime.combine(base_date, shift_cfg['end'])
     else:
-        # Turno cruza medianoche (ej: 22 a 06 del día siguiente)
-        viz_end = datetime.combine(base_date, datetime.min.time()) + timedelta(days=1, hours=shift_cfg['end'])
+        # Turno cruza medianoche
+        viz_end = datetime.combine(base_date + timedelta(days=1), shift_cfg['end'])
 
     return viz_start, viz_end
 
@@ -82,6 +81,7 @@ def update_ui_settings():
 @login_required 
 def get_dashboard_data():
     try:
+        from data_processor import DataProcessor
         # 1. Recepción de Parámetros
         start_str = request.args.get('start')
         end_str = request.args.get('end')
@@ -138,7 +138,7 @@ def get_dashboard_data():
         products_dist = DataProcessor.get_product_distribution(df)
 
         response = {
-            'meta': { 'start': start_date.isoformat(), 'end': end_date.isoformat() },
+            'meta': { 'start': viz_start.isoformat(), 'end': viz_end.isoformat() },
             'kpis': kpis,
             'charts': { 'main': chart_prod, 'comparison': chart_comp },
             'downtime': {

@@ -1,0 +1,18 @@
+{
+    "card-evolution": {
+        "admin": true,
+        "client": true
+    },
+    "card-balance": {
+        "admin": true,
+        "client": false
+    },
+    "card-distribution": {
+        "admin": true,
+        "client": true
+    },
+    "card-downtime": {
+        "admin": true,
+        "client": true
+    }
+}

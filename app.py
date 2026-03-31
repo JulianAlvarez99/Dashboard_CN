@@ -40,12 +40,15 @@ def create_app():
     from routes import api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
 
+    from user_routes import users_bp
+    app.register_blueprint(users_bp, url_prefix='/api/users')
+
     # --- RUTA PRINCIPAL (PROTEGIDA) ---
     @app.route('/')
     @login_required  # <--- 1. Obliga a estar logueado
     def index():
         # <--- 2. Pasa la variable 'user' al HTML
-        return render_template('index.html', user=current_user)
+        return render_template('dashboard_view.html', user=current_user)
 
     return app
 

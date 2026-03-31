@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Central Norte</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='accessibility.css') }}" rel="stylesheet">
+
+    <!-- Estilo extra para la tabla dentro del dropdown -->
+    <style>
+        .dropdown-table th {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #6c757d;
+            padding-bottom: 8px;
+        }
+
+        .dropdown-table td {
+            padding: 8px 4px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .dropdown-table tr:last-child td {
+            border-bottom: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                🏭 Central Norte <span class="badge bg-primary fw-normal small">Dashboard</span>
+            </a>
+
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-none d-md-block text-secondary small fw-bold" id="last-update">Esperando actualización...
+                </div>
+
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-dark border-secondary dropdown-toggle d-flex align-items-center gap-2"
+                        type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="small text-light">{{ user.username }}</span>
+                        <span class="badge bg-secondary" style="font-size: 0.6rem;">{{ user.name_business }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow">
+                        <li><span class="dropdown-item-text small text-white">Rol: {{ user.privilege }}</span></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li><a class="dropdown-item text-danger small fw-bold" href="{{ url_for('auth.logout') }}">
+                                Cerrar Sesión</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 py-4" id="dashboard-content">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="row mb-3">
+            <div class="col-12">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Tabs Nav -->
+        <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard-pane"
+                    type="button" role="tab" aria-controls="dashboard-pane" aria-selected="true">Dashboard</button>
+            </li>
+            {% if user.privilege == 'administrador' or user.name_business == 'Camet' %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-pane" type="button"
+                    role="tab" aria-controls="users-pane" aria-selected="false">Gestión de Usuarios</button>
+            </li>
+            {% endif %}
+        </ul>
+
+        <div class="tab-content" id="mainTabsContent">
+            <!-- DASHBOARD PANE -->
+            <div class="tab-pane fade show active" id="dashboard-pane" role="tabpanel" aria-labelledby="dashboard-tab">
+                <div class="filter-container">
+                    <h6 class="text-primary fw-bold mb-3 border-bottom pb-2">Configuración de Visualización</h6>
+
+                    <div class="filter-grid">
+
+                        <!-- CONTROL DE VISIBILIDAD BIDIMENSIONAL (Solo Admin) -->
+                        {% if user.privilege == 'administrador' %}
+                        <div class="filter-group">
+                            <label>Gestión de Vistas</label>
+                            <div class="dropdown">
+                                <button
+                                    class="btn btn-outline-secondary w-100 dropdown-toggle text-start d-flex justify-content-between align-items-center"
+                                    type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span>⚙️ Configurar Roles</span>
+                                </button>
+                                <div class="dropdown-menu p-3 shadow" style="min-width: 320px;">
+                                    <table class="w-100 dropdown-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="w-50">Componente</th>
+                                                <th class="text-center">Admin</th>
+                                                <th class="text-center">Cliente</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>📈 Evolución</td>
+                                                <td class="text-center"><input class="form-check-input visibility-check"
+                                                        type="checkbox" data-target="card-evolution" data-role="admin">
+                                                </td>
+                                                <td class="text-center"><input class="form-check-input visibility-check"
+                                                        type="checkbox" data-target="card-evolution" data-role="client">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>📊 Balance</td>
+                                                <td class="text-center"><input class="form-check-input visibility-check"
+                                                        type="checkbox" data-target="card-balance" data-role="admin">
+                                                </td>
+                                                <td class="text-center"><input class="form-check-input visibility-check"
+                                                        type="checkbox" data-target="card-balance" data-role="client">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>🍩 Distribución</td>
+                                                <td class="text-center"><input class="form-check-input visibility-check"
+                                                        type="checkbox" data-target="card-distribution"
+                                                        data-role="admin"></td>
+                                                <td class="text-center"><input class="form-check-input visibility-check"
+                                                        type="checkbox" data-target="card-distribution"
+                                                        data-role="client"></td>
+                                            </tr>
+                                            <tr>
+                                                <td>⚠️ Paradas</td>
+                                                <td class="text-center"><input class="form-check-input visibility-check"
+                                                        type="checkbox" data-target="card-downtime" data-role="admin">
+                                                </td>
+                                                <td class="text-center"><input class="form-check-input visibility-check"
+                                                        type="checkbox" data-target="card-downtime" data-role="client">
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <div class="text-muted mt-2" style="font-size: 0.7rem;">* Desmarca para ocultar el
+                                        gráfico al rol correspondiente.</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="filter-group">
+                            <label>Línea de Producción</label>
+                            <select id="line-select" class="form-select">
+                                <option value="ALL">Todas</option>
+                                <option value="linea_1">Línea 1</option>
+                                <option value="linea_2">Línea 2</option>
+                                <option value="linea_3">Línea 3 Semolín</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Mostrar Etiquetas</label>
+                            <select id="display-mode" class="form-select">
+                                <option value="name">Nombre del Producto</option>
+                                <option value="code">Código del Producto</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Fecha Inicio</label>
+                            <input type="date" id="date-start" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <label>Hora Inicio</label>
+                            <input type="time" id="time-start" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <label>Fecha Fin</label>
+                            <input type="date" id="date-end" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <label>Hora Fin</label>
+                            <input type="time" id="time-end" class="form-control">
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Turno</label>
+                            <select id="shift-select" class="form-select">
+                                <option value="all">Todos</option>
+                                <option value="morning">Turno Mañana</option>
+                                <option value="afternoon">Turno Tarde</option>
+                                <!-- <option value="night">Turno Noche (21:30 - 05:45)</option> -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Intervalo</label>
+                            <select id="interval-select" class="form-select">
+                                <option value="1min">1 min</option>
+                                <option value="15min">15 min</option>
+                                <option value="1h" selected>1 hora</option>
+                                <option value="1W">1 Semana</option>
+                                <option value="1ME">1 Mes</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Producto</label>
+                            <select id="product-select" class="form-select">
+                                <option value="ALL">Todos</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Umbral Parada (seg)</label>
+                            <input type="number" id="downtime-threshold" class="form-control" value="60">
+                        </div>
+                        <div class="filter-group pt-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="show-stops-check">
+                                <label class="form-check-label" for="show-stops-check">Ver Paradas</label>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <label>Tipo de Curva</label>
+                            <select id="curve-type" class="form-select">
+                                <option value="0.4" selected>Suave</option>
+                                <option value="0">Recta</option>
+                                <option value="stepped">Escalonada</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4 g-2">
+                        <div class="col-md-6">
+                            <button id="btn-filter" class="btn btn-primary fw-bold w-100 py-2 shadow-sm"
+                                data-html2canvas-ignore="true">
+                                🔄 Actualizar Dashboard
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button id="btn-pdf" class="btn btn-outline-danger fw-bold w-100 py-2 shadow-sm"
+                                data-html2canvas-ignore="true">
+                                📄 Generar Reporte PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4 g-3 justify-content-center" id="kpi-container" style="display: none;">
+                    <div class="col-md-3">
+                        <div
+                            class="card p-3 text-center h-100 border-0 border-bottom border-4 border-success shadow-sm">
+                            <div class="kpi-label mb-1">Producción Total (Salida)</div>
+                            <div class="kpi-value text-success" id="kpi-output">0</div>
+                            <small class="text-muted">Bolsas Paletizadas</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3 text-center h-100 border-0 border-bottom border-4 border-info shadow-sm">
+                            <div class="kpi-label mb-1">Peso Total Producción</div>
+                            <div class="kpi-value text-info" id="kpi-weight">0 kg</div>
+                            <small class="text-muted">Acumulado estimado</small>
+                        </div>
+                    </div>
+
+                    <!-- TARJETAS DE PARADAS (Controladas dinámicamente) -->
+                    <div class="col-md-3 downtime-card-group" id="kpi-card-downtime-count">
+                        <div class="card p-3 text-center h-100 border-0 border-bottom border-4 border-danger shadow-sm">
+                            <div class="kpi-label mb-1">Paradas Registradas</div>
+                            <div class="d-flex justify-content-center align-items-baseline gap-2">
+                                <div class="kpi-value text-danger" id="kpi-downtime-count">0</div>
+                                <span class="text-muted">eventos</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 downtime-card-group" id="kpi-card-downtime-time">
+                        <div class="card p-3 text-center h-100 border-0 border-bottom border-4 border-danger shadow-sm">
+                            <div class="kpi-label mb-1">Tiempo Perdido</div>
+                            <div class="fw-bold text-danger mt-1 fs-4" id="kpi-downtime-time">00:00:00</div>
+                            <small class="text-muted">Total Acumulado</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="empty-state" class="text-center py-5 text-muted">
+                    <h4>👋 Bienvenido al Dashboard de Producción</h4>
+                    <p>Selecciona los filtros deseados y presiona "Actualizar Dashboard" para ver los datos.</p>
+                </div>
+
+                <div id="charts-container" style="display: none;">
+
+                    <div id="card-evolution" class="card mb-4 shadow-sm" style="display: none;">
+                        <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                            <span class="fw-bold text-primary">📈 Evolución de Producción</span>
+                            <small class="text-muted">Zoom: Rueda del mouse | Pan: Click + Arrastre</small>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 450px;">
+                                <canvas id="productionChart"></canvas>
+                            </div>
+                            <div class="text-center mt-2">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="resetZoomChart()"
+                                    data-html2canvas-ignore="true">Restablecer Vista</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="card-balance" class="card mb-4 shadow-sm" style="display: none;">
+                        <div class="card-header fw-bold text-primary">📊 Balance de Línea (Entrada vs Salida)</div>
+                        <div class="card-body">
+                            <div style="height: 350px;">
+                                <canvas id="comparisonChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="card-distribution" class="card mb-4 shadow-sm" style="display: none;">
+                        <div class="card-header fw-bold text-primary">Distribución de Productos</div>
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-4 d-flex justify-content-center">
+                                    <div style="width: 100%; max-width: 300px; height: 300px;">
+                                        <canvas id="productPieChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered align-middle small table-striped">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Producto</th>
+                                                    <th class="text-center">Peso (kg)</th>
+                                                    <th>Bolsas</th>
+                                                    <th>% Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="summary-table-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="card-downtime" class="card mb-5 shadow-sm downtime-list-section" style="display: none;">
+                        <div class="card-header d-flex justify-content-between bg-danger text-white">
+                            <span class="fw-bold">⚠️ Registro Detallado de Paradas</span>
+                        </div>
+                        <div class="card-body p-0 table-responsive" style="max-height: 500px; overflow-y: auto;">
+                            <table class="table table-striped table-hover mb-0 align-middle">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Línea</th>
+                                        <th>Inicio</th>
+                                        <th>Fin</th>
+                                        <th>Duración</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="downtime-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div> <!-- charts-container -->
+            </div> <!-- End dashboard-pane -->
+
+            <!-- USERS PANE -->
+            {% if user.privilege == 'administrador' or user.name_business == 'Camet' %}
+            <div class="tab-pane fade" id="users-pane" role="tabpanel" aria-labelledby="users-tab">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                        <h5 class="mb-0 text-primary fw-bold">👥 Usuarios de {{ user.name_business }}</h5>
+                        <button class="btn btn-primary btn-sm fw-bold" onclick="openAddUserModal()">+ Nuevo
+                            Usuario</button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Privilegio</th>
+                                        <th>Empresa</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">Cargando usuarios...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div> <!-- End tab-content -->
+    </div> <!-- End container-fluid -->
+
+    <!-- Modal Nuevo/Editar Usuario -->
+    <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userModalTitle">Nuevo Usuario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="userId">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre de Usuario</label>
+                        <input type="text" class="form-control" id="formUsername" required>
+                    </div>
+                    <div class="mb-3" id="groupPrivilege">
+                        <label class="form-label">Rol / Privilegio</label>
+                        <select class="form-select" id="formPrivilege">
+                            <option value="cliente" selected>Cliente</option>
+                            <option value="administrador">Administrador</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña</label>
+                        <input type="text" class="form-control" id="formPassword"
+                            placeholder="Dejar en blanco para autogenerar">
+                        <div class="form-text" id="passwordHelp">Si dejas este campo en blanco, se generará una
+                            contraseña segura automáticamente.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary fw-bold" onclick="saveUser()">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmación Eliminación -->
+    <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-danger">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Estás seguro de que deseas eliminar al usuario <strong id="deleteUsername"></strong>?</p>
+                    <p class="text-danger small mb-0"><i class="bi bi-exclamation-triangle"></i> Esta acción no se puede
+                        deshacer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger fw-bold" onclick="confirmDeleteUser()">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Resultado (Para mostrar la contraseña autogenerada) -->
+    <div class="modal fade" id="resultUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-success">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Operación Exitosa</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="resultMessage" class="mb-3">Usuario creado con éxito.</div>
+                    <div class="alert alert-warning" id="resultPasswordBox" style="display:none;">
+                        <strong>Importante:</strong> Guarda la siguiente contraseña ya que es la única vez que se
+                        mostrará:
+                        <h4 class="text-center mt-3 text-monospace" id="resultPassword" style="letter-spacing: 2px;">
+                        </h4>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success fw-bold" data-bs-dismiss="modal">Aceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="pdfModal" tabindex="-1" aria-labelledby="pdfModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content bg-dark text-light border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="pdfModalLabel">📄 Vista Previa del Reporte</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="card bg-secondary bg-opacity-10 border-secondary mb-3">
+                        <div class="card-body py-2">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-auto"><label
+                                        class="col-form-label fw-bold"><small>Formato:</small></label></div>
+                                <div class="col-auto">
+                                    <select class="form-select form-select-sm bg-dark text-light border-secondary"
+                                        id="pdf-format">
+                                        <option value="a4" selected>A4 (Estándar)</option>
+                                        <option value="letter">Carta (Letter)</option>
+                                        <option value="legal">Legal (Oficio)</option>
+                                    </select>
+                                </div>
+                                <div class="col-auto"><label
+                                        class="col-form-label fw-bold"><small>Orientación:</small></label></div>
+                                <div class="col-auto">
+                                    <select class="form-select form-select-sm bg-dark text-light border-secondary"
+                                        id="pdf-orientation">
+                                        <option value="landscape" selected>Horizontal</option>
+                                        <option value="portrait">Vertical</option>
+                                    </select>
+                                </div>
+                                <div class="col-auto ms-auto">
+                                    <button class="btn btn-sm btn-info text-white fw-bold" id="btn-refresh-preview">
+                                        🔄 Actualizar Vista
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ratio" style="--bs-aspect-ratio: 60%; min-height: 500px;">
+                        <iframe id="pdf-preview-frame" class="rounded border border-secondary w-100 h-100"></iframe>
+                    </div>
+                    <div id="pdf-loading-spinner" class="position-absolute top-50 start-50 translate-middle text-center"
+                        style="display: none;">
+                        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+                        <div class="mt-2 fw-bold">Generando vista previa...</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary fw-bold px-4" id="btn-download-final">
+                        ⬇️ Descargar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.API_URLS = {
+            dashboard: "{{ url_for('api.get_dashboard_data') }}",
+            settings: "{{ url_for('api.get_ui_settings') }}",
+            products: "{{ url_for('api.get_products_list') }}",
+            usersList: "{{ url_for('users.get_users') }}",
+            usersAdd: "{{ url_for('users.add_user') }}",
+            usersBase: "{{ url_for('users.get_users') }}".replace('/list', '')
+        };
+
+        // INYECCIÓN DE ROL: Fundamental para la lógica de visibilidad en JS
+        // Usamos 'admin' si es administrador, o 'client' para cualquier otro
+        window.CURRENT_USER_ROLE = "{{ 'admin' if user.privilege == 'administrador' else 'client' }}";
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script type="module" src="{{ url_for('static', filename='main.js') }}?v=3"></script>
+
+    <script>
+        function resetZoomChart() {
+            document.dispatchEvent(new Event('reset-chart-zoom'));
+        }
+
+        // --- GESTIÓN DE USUARIOS JS ---
+        {% if user.privilege == 'administrador' or user.name_business == 'Camet' %}
+        let usersData = [];
+        let userToDelete = null;
+
+        let userModal, deleteModal, resultModal;
+        document.addEventListener('DOMContentLoaded', () => {
+            userModal = new bootstrap.Modal(document.getElementById('userModal'));
+            deleteModal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+            resultModal = new bootstrap.Modal(document.getElementById('resultUserModal'));
+
+            // Auto-ocultar alertas flash después de 5 segundos
+            setTimeout(() => {
+                const alerts = document.querySelectorAll('.alert-dismissible');
+                alerts.forEach(alertEl => {
+                    if (bootstrap.Alert.getInstance(alertEl)) {
+                        bootstrap.Alert.getInstance(alertEl).close();
+                    } else {
+                        new bootstrap.Alert(alertEl).close();
+                    }
+                });
+            }, 5000);
+
+            // Cargar usuarios al hacer clic en la pestaña
+            const usersTabEl = document.getElementById('users-tab');
+            if (usersTabEl) {
+                usersTabEl.addEventListener('shown.bs.tab', loadUsers);
+            }
+        });
+
+        async function loadUsers() {
+            try {
+                const response = await fetch(window.API_URLS.usersList);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Error al cargar usuarios');
+                usersData = data;
+                renderUsersTable();
+            } catch (error) {
+                console.error(error);
+                document.getElementById('users-table-body').innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error cargando usuarios: ${error.message}</td></tr>`;
+            }
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '';
+            if (usersData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No hay usuarios registrados.</td></tr>';
+                return;
+            }
+
+            usersData.forEach(u => {
+                const isSelf = u.username === '{{ user.username }}';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="fw-bold text-dark">${u.username}</td>
+                    <td><span class="badge ${u.privilege === 'administrador' ? 'bg-primary' : 'bg-secondary'}">${u.privilege}</span></td>
+                    <td><span class="badge bg-dark">${u.name_business}</span></td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="openEditUserModal(${u.user_id})">✏️ Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteUserPrompt(${u.user_id}, '${u.username}')" ${isSelf ? 'disabled title="No puedes eliminarte a ti mismo"' : ''}>🗑️ Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openAddUserModal() {
+            document.getElementById('userModalTitle').textContent = 'Nuevo Usuario';
+            document.getElementById('userId').value = '';
+            document.getElementById('formUsername').value = '';
+            document.getElementById('formPassword').value = '';
+            
+            {% if user.name_business == 'Camet' %}
+            document.getElementById('groupPrivilege').style.display = 'block';
+            {% else %}
+            document.getElementById('groupPrivilege').style.display = 'none';
+            document.getElementById('formPrivilege').value = 'cliente';
+            {% endif %}
+            
+            document.getElementById('passwordHelp').textContent = 'Si dejas este campo en blanco, se generará una contraseña segura automáticamente.';
+            userModal.show();
+        }
+
+        function openEditUserModal(id) {
+            const u = usersData.find(x => x.user_id === id);
+            if (!u) return;
+
+            document.getElementById('userModalTitle').textContent = 'Editar Usuario';
+            document.getElementById('userId').value = u.user_id;
+            document.getElementById('formUsername').value = u.username;
+            document.getElementById('formPassword').value = '';
+            document.getElementById('groupPrivilege').style.display = 'none';
+            document.getElementById('passwordHelp').textContent = 'Deja en blanco si NO deseas cambiar la contraseña actual. Escribe aquí para establecer nueva contraseña.';
+            userModal.show();
+        }
+
+        async function saveUser() {
+            const id = document.getElementById('userId').value;
+            const username = document.getElementById('formUsername').value.trim();
+            const password = document.getElementById('formPassword').value.trim();
+            const privilege = document.getElementById('formPrivilege').value;
+
+            if (!username) {
+                alert('El nombre de usuario es requerido');
+                return;
+            }
+
+            const payload = { username, password };
+            let url = window.API_URLS.usersAdd;
+            let method = 'POST';
+
+            if (id) {
+                url = window.API_URLS.usersBase + '/' + id;
+                method = 'PUT';
+                if (!password) delete payload.password;
+            } else {
+                payload.privilege = privilege;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Error en la petición');
+
+                userModal.hide();
+                loadUsers();
+
+                document.getElementById('resultMessage').textContent = data.message;
+                const pwdBox = document.getElementById('resultPasswordBox');
+                if (data.auto_generated && data.password) {
+                    pwdBox.style.display = 'block';
+                    document.getElementById('resultPassword').textContent = data.password;
+                } else {
+                    pwdBox.style.display = 'none';
+                }
+                resultModal.show();
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function confirmDeleteUserPrompt(id, username) {
+            userToDelete = id;
+            document.getElementById('deleteUsername').textContent = username;
+            deleteModal.show();
+        }
+
+        async function confirmDeleteUser() {
+            if (!userToDelete) return;
+            try {
+                const response = await fetch(window.API_URLS.usersBase + '/' + userToDelete, { method: 'DELETE' });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Error al eliminar');
+
+                deleteModal.hide();
+                loadUsers();
+            } catch (error) {
+                alert('Error: ' + error.message);
+                deleteModal.hide();
+            }
+        }
+        {% endif %}
+    </script>
+</body>
+
+</html>
